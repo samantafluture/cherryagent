@@ -1,0 +1,21 @@
+services:
+  api:
+    container_name: cherryagent-api
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    env_file: .env
+    restart: unless-stopped
+    networks:
+      - infra-net
+    volumes:
+      - cherryagent-data:/home/node/.cherryagent
+
+networks:
+  infra-net:
+    external: true
+    name: infra-net
+
+volumes:
+  cherryagent-data:
+    name: cherryagent-data

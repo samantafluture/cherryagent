@@ -1,0 +1,65 @@
+# Stage 1: Install dependencies
+FROM node:20-alpine AS base
+
+RUN corepack enable && corepack prepare pnpm@10.27.0 --activate
+
+WORKDIR /app
+
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY packages/core/package.json packages/core/package.json
+COPY packages/tools/package.json packages/tools/package.json
+COPY packages/api/package.json packages/api/package.json
+
+RUN pnpm install --frozen-lockfile
+
+# Stage 2: Build TypeScript
+FROM base AS build
+
+COPY tsconfig.base.json tsconfig.json ./
+COPY packages/core/tsconfig.json packages/core/
+COPY packages/core/src/ packages/core/src/
+COPY packages/tools/tsconfig.json packages/tools/
+COPY packages/tools/src/ packages/tools/src/
+COPY packages/api/tsconfig.json packages/api/
+COPY packages/api/src/ packages/api/src/
+
+RUN pnpm -r build
+
+# Patch package.json main fields: src/index.ts → dist/index.js
+# Node.js can't load .ts files; tsx handles this in dev but isn't in production
+RUN sed -i 's|"main": "src/index.ts"|"main": "dist/index.js"|g' \
+    packages/core/package.json \
+    packages/tools/package.json \
+    packages/api/package.json
+
+# Stage 3: Production image
+FROM node:20-alpine AS production
+
+RUN corepack enable && corepack prepare pnpm@10.27.0 --activate
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV HOME=/home/node
+
+# Copy patched manifests + lockfile for prod install
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY --from=build /app/packages/core/package.json packages/core/package.json
+COPY --from=build /app/packages/tools/package.json packages/tools/package.json
+COPY --from=build /app/packages/api/package.json packages/api/package.json
+
+RUN pnpm install --frozen-lockfile --prod
+
+# Copy compiled output
+COPY --from=build /app/packages/core/dist/ packages/core/dist/
+COPY --from=build /app/packages/tools/dist/ packages/tools/dist/
+COPY --from=build /app/packages/api/dist/ packages/api/dist/
+
+# Create data directory for Fitbit token storage
+RUN mkdir -p /home/node/.cherryagent && chown -R node:node /home/node/.cherryagent
+
+USER node
+
+EXPOSE 3000
+
+CMD ["node", "packages/api/dist/index.js"]
