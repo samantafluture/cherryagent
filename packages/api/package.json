@@ -1,0 +1,20 @@
+{
+  "name": "@cherryagent/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/",
+    "db:migrate": "echo 'TODO: drizzle-kit migrate'",
+    "db:seed": "echo 'TODO: seed script'"
+  },
+  "dependencies": {
+    "@cherryagent/core": "workspace:*",
+    "@cherryagent/tools": "workspace:*",
+    "fastify": "^5.7.4"
+  }
+}

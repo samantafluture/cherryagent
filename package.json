@@ -1,0 +1,23 @@
+{
+  "name": "cherryagent",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter @cherryagent/api dev",
+    "dev:worker": "pnpm --filter @cherryagent/core dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "db:migrate": "pnpm --filter @cherryagent/api db:migrate",
+    "db:seed": "pnpm --filter @cherryagent/api db:seed"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@10.27.0",
+  "devDependencies": {
+    "@types/node": "^25.3.3",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}
