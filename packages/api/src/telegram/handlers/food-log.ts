@@ -15,11 +15,25 @@ import type { NutritionData, Tool } from "@cherryagent/tools";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 
+// ─── Constants ───
+
+const PORTION_OPTIONS = [0.5, 1, 1.5, 2, 3];
+
+const PORTION_LABELS: Record<number, string> = {
+  0.5: "1/2x",
+  1: "1x",
+  1.5: "1.5x",
+  2: "2x",
+  3: "3x",
+};
+
 // ─── State management (file-backed, survives tsx watch restarts) ───
 
 interface PendingLog {
   nutrition: NutritionData;
   source: "text" | "barcode" | "label_photo" | "food_photo";
+  portion: number;
+  selectedMeal?: string;
   createdAt: number;
 }
 
@@ -59,13 +73,55 @@ function setPending(chatId: string, log: PendingLog): void {
 }
 
 function getPending(chatId: string): PendingLog | undefined {
-  return loadPendingLogs().get(chatId);
+  const log = loadPendingLogs().get(chatId);
+  if (log && log.portion == null) log.portion = 1; // backward compat
+  return log;
 }
 
 function deletePending(chatId: string): void {
   const logs = loadPendingLogs();
   logs.delete(chatId);
   savePendingLogs(logs);
+}
+
+// ─── Helpers ───
+
+function scaleNutrition(base: NutritionData, portion: number): NutritionData {
+  return {
+    ...base,
+    calories: Math.round(base.calories * portion),
+    protein: base.protein != null ? Math.round(base.protein * portion) : undefined,
+    carbs: base.carbs != null ? Math.round(base.carbs * portion) : undefined,
+    fat: base.fat != null ? Math.round(base.fat * portion) : undefined,
+  };
+}
+
+function buildConfirmationKeyboard(
+  portion: number,
+  selectedMeal?: string,
+) {
+  const portionRow = PORTION_OPTIONS.map((p) => ({
+    text: p === portion ? `• ${PORTION_LABELS[p]} •` : PORTION_LABELS[p]!,
+    callback_data: `portion_${p}`,
+  }));
+
+  const meals = [
+    { label: "Breakfast", value: "Breakfast" },
+    { label: "Lunch", value: "Lunch" },
+    { label: "Dinner", value: "Dinner" },
+    { label: "Snack", value: "Anytime" },
+  ];
+  const mealRow = meals.map((m) => ({
+    text: m.value === selectedMeal ? `• ${m.label} •` : m.label,
+    callback_data: `meal_${m.value}`,
+  }));
+
+  const actionRow = [
+    { text: "Log it", callback_data: "food_confirm" },
+    { text: "Cancel", callback_data: "food_cancel" },
+  ];
+
+  return { inline_keyboard: [portionRow, mealRow, actionRow] };
 }
 
 // ─── Factory ───
@@ -272,27 +328,15 @@ export function createFoodLogHandlers(deps: FoodLogDeps) {
     setPending(chatId, {
       nutrition,
       source,
+      portion: 1,
       createdAt: Date.now(),
     });
 
-    const msg = formatNutritionSummary(nutrition, source);
+    const msg = formatNutritionSummary(nutrition, source, 1);
 
     return ctx.reply(msg, {
       parse_mode: "HTML",
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: "Log it", callback_data: "food_confirm" },
-            { text: "Cancel", callback_data: "food_cancel" },
-          ],
-          [
-            { text: "Breakfast", callback_data: "meal_Breakfast" },
-            { text: "Lunch", callback_data: "meal_Lunch" },
-            { text: "Dinner", callback_data: "meal_Dinner" },
-            { text: "Snack", callback_data: "meal_Anytime" },
-          ],
-        ],
-      },
+      reply_markup: buildConfirmationKeyboard(1),
     });
   }
 
@@ -318,35 +362,59 @@ export function createFoodLogHandlers(deps: FoodLogDeps) {
       return ctx.editMessageText("Cancelled.");
     }
 
-    // Determine meal type
-    const VALID_MEALS = new Set([
-      "Breakfast",
-      "Morning Snack",
-      "Lunch",
-      "Afternoon Snack",
-      "Dinner",
-      "Anytime",
-    ]);
-    let mealType: NutritionData["mealType"] =
-      pending.nutrition.mealType ?? "Anytime";
-
-    if (data.startsWith("meal_")) {
-      const parsed = data.replace("meal_", "");
-      if (VALID_MEALS.has(parsed)) {
-        mealType = parsed as NutritionData["mealType"];
+    // ── Portion selection ──
+    if (data.startsWith("portion_")) {
+      const newPortion = Number(data.replace("portion_", ""));
+      if (newPortion === pending.portion) {
+        return ctx.answerCallbackQuery(); // no-op, same portion
       }
-    }
-    // "food_confirm" uses the existing mealType (from LLM parse or default)
+      pending.portion = newPortion;
+      setPending(chatId, pending);
 
-    // Log to Fitbit
-    console.log(`[food-log] Logging to Fitbit: ${pending.nutrition.foodName} (${pending.nutrition.calories} cal) as ${mealType}`);
+      const scaled = scaleNutrition(pending.nutrition, newPortion);
+      const msg = formatNutritionSummary(scaled, pending.source, newPortion);
+      await ctx.editMessageText(msg, {
+        parse_mode: "HTML",
+        reply_markup: buildConfirmationKeyboard(newPortion, pending.selectedMeal),
+      });
+      return ctx.answerCallbackQuery();
+    }
+
+    // ── Meal selection (no logging) ──
+    if (data.startsWith("meal_")) {
+      const VALID_MEALS = new Set([
+        "Breakfast",
+        "Morning Snack",
+        "Lunch",
+        "Afternoon Snack",
+        "Dinner",
+        "Anytime",
+      ]);
+      const parsed = data.replace("meal_", "");
+      if (!VALID_MEALS.has(parsed)) {
+        return ctx.answerCallbackQuery();
+      }
+      pending.selectedMeal = parsed;
+      setPending(chatId, pending);
+
+      await ctx.editMessageReplyMarkup({
+        reply_markup: buildConfirmationKeyboard(pending.portion, parsed),
+      });
+      return ctx.answerCallbackQuery({ text: parsed === "Anytime" ? "Snack" : parsed });
+    }
+
+    // ── Confirm: log to Fitbit ──
+    const mealType = (pending.selectedMeal ?? pending.nutrition.mealType ?? "Anytime") as NutritionData["mealType"];
+    const scaled = scaleNutrition(pending.nutrition, pending.portion);
+
+    console.log(`[food-log] Logging to Fitbit: ${scaled.foodName} (${scaled.calories} cal, ${pending.portion}x) as ${mealType}`);
     const result = await fitbitLogTool.execute(
       {
-        foodName: pending.nutrition.foodName,
-        calories: pending.nutrition.calories,
-        protein: pending.nutrition.protein ?? 0,
-        carbs: pending.nutrition.carbs ?? 0,
-        fat: pending.nutrition.fat ?? 0,
+        foodName: scaled.foodName,
+        calories: scaled.calories,
+        protein: scaled.protein ?? 0,
+        carbs: scaled.carbs ?? 0,
+        fat: scaled.fat ?? 0,
         mealType,
       },
       { taskId: "telegram", permissions: [] },
@@ -367,11 +435,10 @@ export function createFoodLogHandlers(deps: FoodLogDeps) {
   return { handleText, handlePhoto, handleCallback };
 }
 
-// ─── Helpers ───
-
 function formatNutritionSummary(
   n: NutritionData,
   source: PendingLog["source"],
+  portion: number,
 ): string {
   const sourceLabel: Record<string, string> = {
     text: "[text]",
@@ -387,6 +454,9 @@ function formatNutritionSummary(
     `${n.protein ?? 0}g protein | ${n.carbs ?? 0}g carbs | ${n.fat ?? 0}g fat`,
   ];
 
+  if (portion !== 1) {
+    lines.push(`Portion: ${PORTION_LABELS[portion] ?? `${portion}x`}`);
+  }
   if (n.servingSize) {
     lines.push(`Serving: ${n.servingSize}`);
   }
@@ -403,7 +473,7 @@ function formatNutritionSummary(
     lines.push(`Meal: ${n.mealType}`);
   }
 
-  lines.push("", "Tap a meal type, or Log it to use the default:");
+  lines.push("", "Select portion and meal, then tap Log it:");
 
   return lines.join("\n");
 }
