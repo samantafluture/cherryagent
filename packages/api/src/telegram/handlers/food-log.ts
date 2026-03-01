@@ -5,6 +5,7 @@ import {
   CLASSIFY_IMAGE_PROMPT,
   EXTRACT_LABEL_PROMPT,
   ESTIMATE_FOOD_PROMPT,
+  CORRECT_FOOD_PROMPT,
 } from "@cherryagent/core";
 import {
   barcodeLookupTool,
@@ -34,6 +35,7 @@ interface PendingLog {
   source: "text" | "barcode" | "label_photo" | "food_photo";
   portion: number;
   selectedMeal?: string;
+  confirmationMessageId?: number;
   createdAt: number;
 }
 
@@ -149,6 +151,16 @@ export function createFoodLogHandlers(deps: FoodLogDeps) {
     if (text.startsWith("/")) return;
 
     console.log(`[food-log] Text received: "${text}"`);
+
+    // Check if this is a reply to a confirmation message (correction flow)
+    const replyTo = ctx.message.reply_to_message;
+    if (replyTo) {
+      const chatId = String(ctx.chat!.id);
+      const pending = getPending(chatId);
+      if (pending?.confirmationMessageId === replyTo.message_id) {
+        return handleCorrection(ctx, pending, text);
+      }
+    }
 
     // Check if it's a barcode number (8 or 13 digits)
     if (/^\d{8,13}$/.test(text.trim())) {
@@ -318,25 +330,25 @@ export function createFoodLogHandlers(deps: FoodLogDeps) {
 
   // ─── Confirmation Flow (shared by all inputs) ───
 
-  function showConfirmation(
+  async function showConfirmation(
     ctx: Context,
     nutrition: NutritionData,
     source: PendingLog["source"],
   ) {
     const chatId = String(ctx.chat!.id);
+    const msg = formatNutritionSummary(nutrition, source, 1);
+
+    const sent = await ctx.reply(msg, {
+      parse_mode: "HTML",
+      reply_markup: buildConfirmationKeyboard(1),
+    });
 
     setPending(chatId, {
       nutrition,
       source,
       portion: 1,
+      confirmationMessageId: sent.message_id,
       createdAt: Date.now(),
-    });
-
-    const msg = formatNutritionSummary(nutrition, source, 1);
-
-    return ctx.reply(msg, {
-      parse_mode: "HTML",
-      reply_markup: buildConfirmationKeyboard(1),
     });
   }
 
@@ -430,6 +442,61 @@ export function createFoodLogHandlers(deps: FoodLogDeps) {
       await ctx.answerCallbackQuery({ text: "Failed" });
       return ctx.editMessageText(`Failed: ${result.output}`);
     }
+  }
+
+  // ─── Correction Flow (reply-to-correct) ───
+
+  async function handleCorrection(
+    ctx: Context,
+    pending: PendingLog,
+    correctionText: string,
+  ) {
+    const chatId = String(ctx.chat!.id);
+
+    await ctx.reply("Updating...");
+
+    const response = await gemini.chat({
+      systemInstruction: CORRECT_FOOD_PROMPT,
+      messages: [
+        {
+          role: "user",
+          content: `Original nutrition data:\n${JSON.stringify(pending.nutrition, null, 2)}\n\nCorrection: ${correctionText}`,
+        },
+      ],
+      jsonMode: true,
+    });
+
+    if (!response.content) {
+      return ctx.reply("Couldn't process the correction. Try again?");
+    }
+
+    let corrected: NutritionData;
+    try {
+      corrected = JSON.parse(response.content) as NutritionData;
+    } catch {
+      return ctx.reply("Couldn't parse the correction. Try again?");
+    }
+
+    if (!corrected.foodName || !corrected.calories) {
+      return ctx.reply("Couldn't apply the correction. Try being more specific.");
+    }
+
+    // Update pending: replace nutrition, reset portion (base values changed)
+    pending.nutrition = corrected;
+    pending.portion = 1;
+    setPending(chatId, pending);
+
+    const msg = formatNutritionSummary(corrected, pending.source, 1);
+
+    await ctx.api.editMessageText(
+      chatId,
+      pending.confirmationMessageId!,
+      msg,
+      {
+        parse_mode: "HTML",
+        reply_markup: buildConfirmationKeyboard(1, pending.selectedMeal),
+      },
+    );
   }
 
   return { handleText, handlePhoto, handleCallback };

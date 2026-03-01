@@ -6,6 +6,7 @@ export {
   CLASSIFY_IMAGE_PROMPT,
   EXTRACT_LABEL_PROMPT,
   ESTIMATE_FOOD_PROMPT,
+  CORRECT_FOOD_PROMPT,
 } from "./prompts/food-logging.js";
 export type {
   AgentLoopConfig,
