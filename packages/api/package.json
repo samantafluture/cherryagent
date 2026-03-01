@@ -5,7 +5,7 @@
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch --env-file=../../.env src/index.ts",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
@@ -15,6 +15,7 @@
   "dependencies": {
     "@cherryagent/core": "workspace:*",
     "@cherryagent/tools": "workspace:*",
-    "fastify": "^5.7.4"
+    "fastify": "^5.7.4",
+    "grammy": "^1.40.1"
   }
 }

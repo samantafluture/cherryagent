@@ -70,7 +70,14 @@ export function createFitbitLogFoodTool(auth: FitbitAuth): Tool {
         };
       }
 
-      const today = new Date().toISOString().split("T")[0]!;
+      // Use local date, not UTC — otherwise entries land on "tomorrow"
+      // when logging after midnight UTC but before midnight local time
+      const now = new Date();
+      const today = [
+        now.getFullYear(),
+        String(now.getMonth() + 1).padStart(2, "0"),
+        String(now.getDate()).padStart(2, "0"),
+      ].join("-");
 
       const body = new URLSearchParams({
         foodName,
