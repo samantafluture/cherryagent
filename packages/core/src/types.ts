@@ -23,6 +23,16 @@ export interface Message {
   toolCallId?: string;
 }
 
+export interface ChatParams {
+  messages: Message[];
+  tools?: ToolDefinition[];
+  systemInstruction?: string;
+  temperature?: number;
+  maxTokens?: number;
+  jsonMode?: boolean;
+  jsonSchema?: Record<string, unknown>;
+}
+
 export interface LLMProvider {
   id: string;
   tier: 0 | 1 | 2 | 3;
@@ -31,12 +41,7 @@ export interface LLMProvider {
   maxContextTokens: number;
   supportsToolCalling: boolean;
 
-  chat(params: {
-    messages: Message[];
-    tools?: ToolDefinition[];
-    temperature?: number;
-    maxTokens?: number;
-  }): Promise<LLMResponse>;
+  chat(params: ChatParams): Promise<LLMResponse>;
 }
 
 export interface LLMResponse {

@@ -11,7 +11,6 @@ export class AgentLoop {
 
   async run(provider: LLMProvider, systemPrompt: string, taskPrompt: string): Promise<LLMResponse> {
     this.messages = [
-      { role: "system", content: systemPrompt },
       { role: "user", content: taskPrompt },
     ];
 
@@ -21,6 +20,7 @@ export class AgentLoop {
       const response = await provider.chat({
         messages: this.messages,
         tools: this.config.tools,
+        systemInstruction: systemPrompt,
       });
 
       if (response.finishReason === "stop" || response.finishReason === "error") {
