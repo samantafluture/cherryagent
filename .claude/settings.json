@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add packages/core/package.json packages/core/src/agent-loop.ts packages/core/src/index.ts packages/core/src/types.ts packages/core/src/providers/gemini.ts scripts/test-gemini.ts pnpm-lock.yaml)",
+      "Bash(pnpm tsx scripts/test-food-log.ts)",
+      "Bash(git add .env.example packages/core/src/index.ts packages/core/src/prompts/food-logging.ts packages/tools/src/index.ts packages/tools/src/nutrition/types.ts packages/tools/src/nutrition/barcode-lookup.ts packages/tools/src/fitbit/auth.ts packages/tools/src/fitbit/food-log.ts scripts/test-food-log.ts)",
+      "Bash(pnpm --filter @cherryagent/api add grammy)",
+      "Bash(timeout 8 pnpm dev)",
+      "Bash(node --version)",
+      "Bash(timeout 10 pnpm dev)",
+      "Bash(curl -s \"http://localhost:3000/api/fitbit/callback?code=fake\")",
+      "Bash(node -e \":*)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\nRedirect: %{redirect_url}\\\\n\" \"https://www.fitbit.com/oauth2/authorize?response_type=code&client_id=23V32H&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fapi%2Ffitbit%2Fcallback&scope=nutrition&expires_in=604800\")",
+      "Read(//home/samantafluture/.cherryagent/**)",
+      "Bash(node --env-file=.env -e \":*)",
+      "Bash(git -C /home/samantafluture/Development/cherryagent status -u)",
+      "Bash(git -C /home/samantafluture/Development/cherryagent diff)",
+      "Bash(git -C /home/samantafluture/Development/cherryagent log --oneline -5)",
+      "Bash(git add packages/api/package.json packages/api/src/index.ts packages/api/src/server.ts packages/api/src/routes/fitbit-callback.ts packages/api/src/telegram/bot.ts packages/api/src/telegram/middleware.ts packages/api/src/telegram/handlers/food-log.ts packages/tools/src/fitbit/food-log.ts scripts/fitbit-auth.ts pnpm-lock.yaml)"
+    ]
+  }
+}
