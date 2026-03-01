@@ -11,7 +11,7 @@ import {
   createFitbitLogFoodTool,
   FitbitAuth,
 } from "@cherryagent/tools";
-import type { NutritionData, Tool } from "@cherryagent/tools";
+import type { NutritionData } from "@cherryagent/tools";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 
