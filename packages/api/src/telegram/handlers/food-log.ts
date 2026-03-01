@@ -78,7 +78,10 @@ interface FoodLogDeps {
 
 export function createFoodLogHandlers(deps: FoodLogDeps) {
   const { gemini, fitbitAuth, botToken } = deps;
-  const fitbitLogTool = createFitbitLogFoodTool(fitbitAuth);
+  const fitbitLogTool = createFitbitLogFoodTool(
+    fitbitAuth,
+    process.env.USER_TIMEZONE,
+  );
 
   // ─── FLOW 1: Text input ───
 

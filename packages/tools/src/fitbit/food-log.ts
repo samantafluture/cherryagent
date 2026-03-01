@@ -10,7 +10,10 @@ const MEAL_TYPE_MAP: Record<string, number> = {
   Anytime: 7,
 };
 
-export function createFitbitLogFoodTool(auth: FitbitAuth): Tool {
+export function createFitbitLogFoodTool(
+  auth: FitbitAuth,
+  timezone = "America/Toronto",
+): Tool {
   return {
     name: "fitbit.logFood",
     description:
@@ -70,14 +73,10 @@ export function createFitbitLogFoodTool(auth: FitbitAuth): Tool {
         };
       }
 
-      // Use local date, not UTC — otherwise entries land on "tomorrow"
-      // when logging after midnight UTC but before midnight local time
-      const now = new Date();
-      const today = [
-        now.getFullYear(),
-        String(now.getMonth() + 1).padStart(2, "0"),
-        String(now.getDate()).padStart(2, "0"),
-      ].join("-");
+      // Format date in user's timezone — en-CA locale gives YYYY-MM-DD
+      const today = new Date().toLocaleDateString("en-CA", {
+        timeZone: timezone,
+      });
 
       const body = new URLSearchParams({
         foodName,
