@@ -20,7 +20,7 @@ MAX_RETRIES=10
 RETRY_INTERVAL=3
 
 for i in $(seq 1 $MAX_RETRIES); do
-  if docker exec cherryagent-api wget -qO- http://localhost:3000/health > /dev/null 2>&1; then
+  if docker exec cherryagent-api wget -qO- http://127.0.0.1:3000/health > /dev/null 2>&1; then
     echo "==> Health check passed! (attempt $i/$MAX_RETRIES)"
     break
   fi
