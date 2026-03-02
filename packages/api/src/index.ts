@@ -1,7 +1,7 @@
 import { createServer } from "./server.js";
 import { createBot } from "./telegram/bot.js";
-import { GeminiProvider } from "@cherryagent/core";
-import { FitbitAuth } from "@cherryagent/tools";
+import { GeminiProvider, GroqWhisperClient, DeepSeekProvider } from "@cherryagent/core";
+import { FitbitAuth, getMediaConfig, startMediaCleanup } from "@cherryagent/tools";
 
 const PORT = parseInt(process.env["PORT"] ?? "3000", 10);
 const HOST = process.env["HOST"] ?? "0.0.0.0";
@@ -29,6 +29,19 @@ async function main() {
       "http://localhost:3000/api/fitbit/callback",
   });
 
+  const whisper = new GroqWhisperClient({
+    apiKey: requireEnv("GROQ_API_KEY"),
+  });
+
+  const deepseek = new DeepSeekProvider({
+    apiKey: requireEnv("DEEPSEEK_API_KEY"),
+  });
+
+  const mediaConfig = getMediaConfig();
+
+  // Start media cleanup (every 6 hours)
+  const cleanupTimer = startMediaCleanup(mediaConfig);
+
   // Start Fastify (health + Fitbit OAuth callback)
   const server = await createServer({ fitbitAuth });
   await server.listen({ port: PORT, host: HOST });
@@ -40,6 +53,9 @@ async function main() {
     authorizedChatId: requireEnv("TELEGRAM_CHAT_ID"),
     gemini,
     fitbitAuth,
+    whisper,
+    deepseek,
+    mediaConfig,
   });
 
   bot.start({
@@ -49,6 +65,7 @@ async function main() {
   // Graceful shutdown
   const shutdown = async () => {
     console.log("Shutting down...");
+    clearInterval(cleanupTimer);
     await bot.stop();
     await server.close();
     process.exit(0);

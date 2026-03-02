@@ -10,6 +10,7 @@ services:
       - infra-net
     volumes:
       - cherryagent-data:/home/node/.cherryagent
+      - cherryagent-media:/opt/cherry-agent/media
 
 networks:
   infra-net:
@@ -19,3 +20,5 @@ networks:
 volumes:
   cherryagent-data:
     name: cherryagent-data
+  cherryagent-media:
+    name: cherryagent-media

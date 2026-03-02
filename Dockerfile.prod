@@ -37,6 +37,10 @@ FROM node:20-alpine AS production
 
 RUN corepack enable && corepack prepare pnpm@10.27.0 --activate
 
+# Install ffmpeg, python3, and yt-dlp for YouTube workflow
+RUN apk add --no-cache ffmpeg python3 py3-pip \
+  && pip3 install --no-cache-dir --break-system-packages yt-dlp
+
 WORKDIR /app
 
 ENV NODE_ENV=production
@@ -55,8 +59,9 @@ COPY --from=build /app/packages/core/dist/ packages/core/dist/
 COPY --from=build /app/packages/tools/dist/ packages/tools/dist/
 COPY --from=build /app/packages/api/dist/ packages/api/dist/
 
-# Create data directory for Fitbit token storage
-RUN mkdir -p /home/node/.cherryagent && chown -R node:node /home/node/.cherryagent
+# Create data directory for Fitbit token storage and media
+RUN mkdir -p /home/node/.cherryagent /opt/cherry-agent/media \
+  && chown -R node:node /home/node/.cherryagent /opt/cherry-agent/media
 
 USER node
 

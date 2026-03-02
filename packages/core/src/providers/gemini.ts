@@ -14,6 +14,15 @@ export interface ChatWithImageParams {
   maxTokens?: number;
 }
 
+export interface ChatWithVideoParams {
+  prompt: string;
+  videoPath: string;
+  mimeType?: string;
+  systemInstruction?: string;
+  temperature?: number;
+  maxTokens?: number;
+}
+
 interface GeminiContent {
   role: "user" | "model";
   parts: GeminiPart[];
@@ -133,6 +142,65 @@ export class GeminiProvider implements LLMProvider {
       contents,
       config,
     });
+
+    return this.normalizeResponse(response);
+  }
+
+  async chatWithVideo(params: ChatWithVideoParams): Promise<LLMResponse> {
+    // Upload video via Gemini File API
+    const uploadResult = await this.client.files.upload({
+      file: params.videoPath,
+      config: { mimeType: params.mimeType ?? "video/mp4" },
+    });
+
+    if (!uploadResult.uri) {
+      throw new Error("Gemini File API upload failed — no URI returned");
+    }
+
+    // Poll until the file is processed
+    let file = uploadResult;
+    while (file.state === "PROCESSING") {
+      await new Promise((r) => setTimeout(r, 3000));
+      const fetched = await this.client.files.get({ name: file.name! });
+      file = fetched as typeof file;
+    }
+
+    if (file.state === "FAILED") {
+      throw new Error("Gemini File API video processing failed");
+    }
+
+    const contents: GeminiContent[] = [
+      {
+        role: "user",
+        parts: [
+          { fileData: { fileUri: file.uri!, mimeType: params.mimeType ?? "video/mp4" } } as unknown as GeminiPart,
+          { text: params.prompt },
+        ],
+      },
+    ];
+
+    const config: Record<string, unknown> = {
+      temperature: params.temperature ?? 0.3,
+      maxOutputTokens: params.maxTokens ?? 8192,
+      thinkingConfig: { thinkingBudget: 0 },
+    };
+
+    if (params.systemInstruction) {
+      config.systemInstruction = params.systemInstruction;
+    }
+
+    const response = await this.client.models.generateContent({
+      model: this.model,
+      contents,
+      config,
+    });
+
+    // Clean up the uploaded file
+    try {
+      await this.client.files.delete({ name: file.name! });
+    } catch {
+      // non-critical — file will expire on its own
+    }
 
     return this.normalizeResponse(response);
   }

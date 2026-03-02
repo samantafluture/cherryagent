@@ -6,6 +6,6 @@ dist/
 .env.local
 
 *.log
-media/
+/media/
 uploads/
 outputs/
