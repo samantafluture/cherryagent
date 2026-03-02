@@ -3,7 +3,6 @@ export { GeminiProvider } from "./providers/gemini.js";
 export type { ChatWithImageParams, ChatWithVideoParams } from "./providers/gemini.js";
 export { GroqWhisperClient } from "./providers/groq-whisper.js";
 export type { TranscriptionResult, TranscriptionSegment } from "./providers/groq-whisper.js";
-export { DeepSeekProvider } from "./providers/deepseek.js";
 export {
   FOOD_PARSE_SYSTEM_PROMPT,
   CLASSIFY_IMAGE_PROMPT,

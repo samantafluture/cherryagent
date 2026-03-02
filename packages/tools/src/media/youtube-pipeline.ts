@@ -29,28 +29,25 @@ interface LLMChatResponse {
   usage: { inputTokens: number; outputTokens: number };
 }
 
-interface NotesProvider {
+interface LLMClient {
   chat(params: {
     systemInstruction?: string;
     messages: { role: "user" | "system" | "assistant" | "tool"; content: string }[];
     maxTokens?: number;
   }): Promise<LLMChatResponse>;
-  estimateCost(inputTokens: number, outputTokens: number): number;
-}
-
-interface VideoNotesProvider {
   chatWithVideo(params: {
     prompt: string;
     videoPath: string;
     systemInstruction?: string;
     maxTokens?: number;
   }): Promise<LLMChatResponse>;
+  inputCostPer1M: number;
+  outputCostPer1M: number;
 }
 
 export interface PipelineDeps {
   whisper: WhisperClient;
-  deepseek: NotesProvider;
-  gemini: VideoNotesProvider;
+  llm: LLMClient;
   notesSystemPrompt: string;
   richNotesSystemPrompt: string;
 }
@@ -112,20 +109,16 @@ export async function runYouTubePipeline(
   if (mode === "rich") {
     // Path B: Gemini multimodal video input
     onProgress?.("generating_notes", "Gemini (rich mode)");
-    const geminiResponse = await deps.gemini.chatWithVideo({
+    const response = await deps.llm.chatWithVideo({
       prompt: `Generate detailed reading notes for this video titled "${metadata.title}" by ${metadata.authorName}.`,
       videoPath: videoPath!,
       systemInstruction: deps.richNotesSystemPrompt,
       maxTokens: 8192,
     });
-    notes = geminiResponse.content ?? "Failed to generate notes.";
-
-    // Gemini video cost: ~$0.30/1M input tokens
-    const inputCost = (geminiResponse.usage.inputTokens / 1_000_000) * 0.30;
-    const outputCost = (geminiResponse.usage.outputTokens / 1_000_000) * 2.50;
-    totalCost += inputCost + outputCost;
+    notes = response.content ?? "Failed to generate notes.";
+    totalCost += estimateLLMCost(deps.llm, response.usage);
   } else {
-    // Path A: Whisper transcription → DeepSeek notes
+    // Path A: Whisper transcription → Gemini notes
     onProgress?.("transcribing", "Groq Whisper");
     const transcription = await deps.whisper.transcribe(audioPath!);
     totalCost += deps.whisper.estimateCost(transcription.durationSeconds);
@@ -141,8 +134,8 @@ export async function runYouTubePipeline(
       })
       .join("\n");
 
-    onProgress?.("generating_notes", "DeepSeek");
-    const deepseekResponse = await deps.deepseek.chat({
+    onProgress?.("generating_notes", "Gemini");
+    const response = await deps.llm.chat({
       systemInstruction: deps.notesSystemPrompt,
       messages: [
         {
@@ -152,13 +145,8 @@ export async function runYouTubePipeline(
       ],
       maxTokens: 4096,
     });
-    notes = deepseekResponse.content ?? "Failed to generate notes.";
-
-    const dsCost = deps.deepseek.estimateCost(
-      deepseekResponse.usage.inputTokens,
-      deepseekResponse.usage.outputTokens,
-    );
-    totalCost += dsCost;
+    notes = response.content ?? "Failed to generate notes.";
+    totalCost += estimateLLMCost(deps.llm, response.usage);
   }
 
   // Step 4: Cleanup for notes-only mode (delete audio after transcription)
@@ -184,4 +172,12 @@ export async function runYouTubePipeline(
     costUsd: totalCost,
     mode,
   };
+}
+
+function estimateLLMCost(
+  llm: { inputCostPer1M: number; outputCostPer1M: number },
+  usage: { inputTokens: number; outputTokens: number },
+): number {
+  return (usage.inputTokens / 1_000_000) * llm.inputCostPer1M +
+    (usage.outputTokens / 1_000_000) * llm.outputCostPer1M;
 }

@@ -32,9 +32,10 @@ export async function downloadVideo(opts: DownloadOptions): Promise<DownloadResu
   if (mode === "audio") {
     const outputPath = join(config.mediaDir, `${slug}_${timestamp}.mp3`);
     const args = [
+      "-f", "ba/b",  // best audio, fallback to best combined
       "-x",
       "--audio-format", "mp3",
-      "--audio-quality", config.audioBitrate,
+      "--audio-quality", "128K",
       "--no-playlist",
       "--no-warnings",
       "-o", outputPath,
@@ -47,11 +48,11 @@ export async function downloadVideo(opts: DownloadOptions): Promise<DownloadResu
     return { filePath: outputPath, fileSizeBytes: stats.size, format: "mp3" };
   }
 
-  // Video mode
+  // Video mode — use format sorting for reliable mp4 merging
+  const h = config.videoMaxHeight;
   const outputPath = join(config.mediaDir, `${slug}_${timestamp}.mp4`);
-  const formatSpec = `bestvideo[height<=${config.videoMaxHeight}]+bestaudio/best[height<=${config.videoMaxHeight}]`;
   const args = [
-    "-f", formatSpec,
+    "-f", `bv[height<=${h}][ext=mp4]+ba[ext=m4a]/b[height<=${h}][ext=mp4]/b[height<=${h}]`,
     "--merge-output-format", "mp4",
     "--no-playlist",
     "--no-warnings",

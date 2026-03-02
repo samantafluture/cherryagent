@@ -1,7 +1,7 @@
 import { createReadStream } from "node:fs";
 import type { Context } from "grammy";
 import { InputFile } from "grammy";
-import type { GeminiProvider, GroqWhisperClient, DeepSeekProvider } from "@cherryagent/core";
+import type { GeminiProvider, GroqWhisperClient } from "@cherryagent/core";
 import {
   YOUTUBE_NOTES_SYSTEM_PROMPT,
   YOUTUBE_NOTES_RICH_SYSTEM_PROMPT,
@@ -28,13 +28,12 @@ const PROGRESS_LABELS: Record<ProgressStep, string> = {
 
 interface YouTubeDeps {
   whisper: GroqWhisperClient;
-  deepseek: DeepSeekProvider;
   gemini: GeminiProvider;
   mediaConfig: MediaConfig;
 }
 
 export function createYouTubeHandlers(deps: YouTubeDeps) {
-  const { whisper, deepseek, gemini, mediaConfig } = deps;
+  const { whisper, gemini, mediaConfig } = deps;
 
   async function handleYtCommand(ctx: Context) {
     const text = (ctx.match as string | undefined)?.trim();
@@ -97,8 +96,7 @@ export function createYouTubeHandlers(deps: YouTubeDeps) {
         mode,
         {
           whisper,
-          deepseek,
-          gemini,
+          llm: gemini,
           notesSystemPrompt: YOUTUBE_NOTES_SYSTEM_PROMPT,
           richNotesSystemPrompt: YOUTUBE_NOTES_RICH_SYSTEM_PROMPT,
         },

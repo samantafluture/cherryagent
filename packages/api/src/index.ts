@@ -1,6 +1,6 @@
 import { createServer } from "./server.js";
 import { createBot } from "./telegram/bot.js";
-import { GeminiProvider, GroqWhisperClient, DeepSeekProvider } from "@cherryagent/core";
+import { GeminiProvider, GroqWhisperClient } from "@cherryagent/core";
 import { FitbitAuth, getMediaConfig, startMediaCleanup } from "@cherryagent/tools";
 
 const PORT = parseInt(process.env["PORT"] ?? "3000", 10);
@@ -33,10 +33,6 @@ async function main() {
     apiKey: requireEnv("GROQ_API_KEY"),
   });
 
-  const deepseek = new DeepSeekProvider({
-    apiKey: requireEnv("DEEPSEEK_API_KEY"),
-  });
-
   const mediaConfig = getMediaConfig();
 
   // Start media cleanup (every 6 hours)
@@ -54,7 +50,6 @@ async function main() {
     gemini,
     fitbitAuth,
     whisper,
-    deepseek,
     mediaConfig,
   });
 

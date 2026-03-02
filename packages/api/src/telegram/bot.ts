@@ -2,7 +2,7 @@ import { Bot } from "grammy";
 import { authMiddleware } from "./middleware.js";
 import { createFoodLogHandlers } from "./handlers/food-log.js";
 import { createYouTubeHandlers } from "./handlers/youtube.js";
-import type { GeminiProvider, GroqWhisperClient, DeepSeekProvider } from "@cherryagent/core";
+import type { GeminiProvider, GroqWhisperClient } from "@cherryagent/core";
 import type { FitbitAuth, MediaConfig } from "@cherryagent/tools";
 
 export interface BotDeps {
@@ -11,7 +11,6 @@ export interface BotDeps {
   gemini: GeminiProvider;
   fitbitAuth: FitbitAuth;
   whisper: GroqWhisperClient;
-  deepseek: DeepSeekProvider;
   mediaConfig: MediaConfig;
 }
 
@@ -29,7 +28,6 @@ export function createBot(deps: BotDeps) {
 
   const ytHandlers = createYouTubeHandlers({
     whisper: deps.whisper,
-    deepseek: deps.deepseek,
     gemini: deps.gemini,
     mediaConfig: deps.mediaConfig,
   });
