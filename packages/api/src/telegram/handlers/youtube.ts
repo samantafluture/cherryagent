@@ -116,14 +116,16 @@ export function createYouTubeHandlers(deps: YouTubeDeps) {
 
       await ctx.api.editMessageText(chatId, progressMsg.message_id, doneText);
 
+      const title = result.metadata.title;
+
       // Deliver video
       if (result.videoPath) {
-        await deliverFile(ctx, result.videoPath, result.videoSizeBytes ?? 0, "video");
+        await deliverFile(ctx, result.videoPath, result.videoSizeBytes ?? 0, "video", title);
       }
 
       // Deliver audio
       if (result.audioPath) {
-        await deliverFile(ctx, result.audioPath, result.audioSizeBytes ?? 0, "audio");
+        await deliverFile(ctx, result.audioPath, result.audioSizeBytes ?? 0, "audio", title);
       }
 
       // Deliver notes
@@ -133,9 +135,10 @@ export function createYouTubeHandlers(deps: YouTubeDeps) {
         } else {
           // Send as a document
           const notesBuffer = Buffer.from(result.notes, "utf-8");
-          const file = new InputFile(notesBuffer, "notes.md");
+          const notesFilename = `${sanitizeFilename(title)} - Notes.md`;
+          const file = new InputFile(notesBuffer, notesFilename);
           await ctx.replyWithDocument(file, {
-            caption: `Notes for "${result.metadata.title}"`,
+            caption: `Notes for "${title}"`,
           });
         }
       }
@@ -154,6 +157,7 @@ export function createYouTubeHandlers(deps: YouTubeDeps) {
     filePath: string,
     sizeBytes: number,
     type: "video" | "audio",
+    title: string,
   ) {
     if (sizeBytes > TELEGRAM_FILE_LIMIT) {
       await ctx.reply(
@@ -163,13 +167,15 @@ export function createYouTubeHandlers(deps: YouTubeDeps) {
       return;
     }
 
+    const ext = type === "video" ? ".mp4" : ".mp3";
+    const filename = `${sanitizeFilename(title)}${ext}`;
     const stream = createReadStream(filePath);
-    const file = new InputFile(stream);
+    const file = new InputFile(stream, filename);
 
     if (type === "video") {
       await ctx.replyWithVideo(file);
     } else {
-      await ctx.replyWithAudio(file);
+      await ctx.replyWithAudio(file, { title });
     }
   }
 
@@ -180,4 +186,13 @@ function formatDuration(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
+/** Produce a safe filename from a video title, preserving readability. */
+function sanitizeFilename(title: string): string {
+  return title
+    .replace(/[<>:"/\\|?*]+/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 100);
 }
