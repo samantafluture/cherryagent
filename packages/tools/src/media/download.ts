@@ -1,11 +1,19 @@
 import { execFile } from "node:child_process";
-import { stat, mkdir } from "node:fs/promises";
+import { stat, mkdir, copyFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import type { DownloadResult } from "./types.js";
 import type { MediaConfig } from "./config.js";
 
 const execFileAsync = promisify(execFile);
+
+/** Copy cookies to a writable temp path so yt-dlp can save updates */
+async function getWritableCookiesArgs(config: MediaConfig): Promise<string[]> {
+  if (!config.cookiesFile) return [];
+  const tempCookies = join(config.mediaDir, ".cookies.tmp.txt");
+  await copyFile(config.cookiesFile, tempCookies);
+  return ["--cookies", tempCookies];
+}
 
 function slugify(title: string): string {
   return title
@@ -29,7 +37,7 @@ export async function downloadVideo(opts: DownloadOptions): Promise<DownloadResu
   const slug = slugify(title);
   const timestamp = Date.now();
 
-  const cookiesArgs = config.cookiesFile ? ["--cookies", config.cookiesFile] : [];
+  const cookiesArgs = await getWritableCookiesArgs(config);
 
   if (mode === "audio") {
     const outputPath = join(config.mediaDir, `${slug}_${timestamp}.mp3`);
@@ -56,7 +64,7 @@ export async function downloadVideo(opts: DownloadOptions): Promise<DownloadResu
   const outputPath = join(config.mediaDir, `${slug}_${timestamp}.mp4`);
   const args = [
     ...cookiesArgs,
-    "-S", `res:${h},ext:mp4:m4a`,
+    "-S", `res:${h}`,
     "--merge-output-format", "mp4",
     "--no-playlist",
     "--no-warnings",
