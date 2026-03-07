@@ -51,12 +51,12 @@ export async function downloadVideo(opts: DownloadOptions): Promise<DownloadResu
     return { filePath: outputPath, fileSizeBytes: stats.size, format: "mp3" };
   }
 
-  // Video mode — use format sorting for reliable mp4 merging
+  // Video mode — use format sorting for flexible format selection
   const h = config.videoMaxHeight;
   const outputPath = join(config.mediaDir, `${slug}_${timestamp}.mp4`);
   const args = [
     ...cookiesArgs,
-    "-f", `bv[height<=${h}][ext=mp4]+ba[ext=m4a]/b[height<=${h}][ext=mp4]/b[height<=${h}]`,
+    "-S", `res:${h},ext:mp4:m4a`,
     "--merge-output-format", "mp4",
     "--no-playlist",
     "--no-warnings",
