@@ -8,13 +8,19 @@ import {
 } from "@cherryagent/core";
 import {
   isYouTubeUrl,
+  validateYouTubeUrl,
   runYouTubePipeline,
+  addFavorite,
+  listFavorites,
+  getFavoriteByIndex,
+  removeFavoriteByIndex,
 } from "@cherryagent/tools";
 import type { YouTubeMode, MediaConfig, ProgressStep } from "@cherryagent/tools";
 
 const TELEGRAM_FILE_LIMIT = 50 * 1024 * 1024; // 50MB
 
 const VALID_MODES = new Set<YouTubeMode>(["full", "rich", "audio", "notes"]);
+const SUBCOMMANDS = new Set(["save", "list", "pick", "rm"]);
 
 const PROGRESS_LABELS: Record<ProgressStep, string> = {
   validating: "Validating URL...",
@@ -39,14 +45,31 @@ export function createYouTubeHandlers(deps: YouTubeDeps) {
     const text = (ctx.match as string | undefined)?.trim();
     if (!text) {
       return ctx.reply(
-        "Usage: /yt <url> [mode]\n\n" +
+        "Usage: /yt [mode] <url>\n\n" +
         "Modes:\n" +
         "  full — video + audio + notes (default)\n" +
         "  rich — video + audio + notes (Gemini multimodal)\n" +
         "  audio — audio + notes only\n" +
         "  notes — notes only\n\n" +
+        "Favorites:\n" +
+        "  /yt save <url> — save for later\n" +
+        "  /yt list — show saved videos\n" +
+        "  /yt pick <#> [mode] — process a saved video\n" +
+        "  /yt rm <#> — remove from list\n\n" +
         "Batch: send multiple URLs on separate lines",
       );
+    }
+
+    // Check for subcommands
+    const firstToken = text.split(/\s+/)[0]!.toLowerCase();
+    if (SUBCOMMANDS.has(firstToken)) {
+      const rest = text.slice(firstToken.length).trim();
+      switch (firstToken) {
+        case "save": return handleSave(ctx, rest);
+        case "list": return handleList(ctx);
+        case "pick": return handlePick(ctx, rest);
+        case "rm": return handleRemove(ctx, rest);
+      }
     }
 
     // Parse URLs and mode from the input
@@ -73,6 +96,78 @@ export function createYouTubeHandlers(deps: YouTubeDeps) {
     for (const url of urls) {
       await processOneUrl(ctx, url, mode);
     }
+  }
+
+  async function handleSave(ctx: Context, rest: string) {
+    const url = rest.split(/\s+/).find((p) => isYouTubeUrl(p));
+    if (!url) {
+      return ctx.reply("Usage: /yt save <url>");
+    }
+
+    try {
+      const meta = await validateYouTubeUrl(url);
+      const { item, alreadyExisted } = await addFavorite(
+        url,
+        meta.title,
+        meta.authorName,
+        meta.thumbnailUrl,
+      );
+      const label = alreadyExisted ? "Already saved" : "Saved";
+      return ctx.reply(`${label}: "${item.title}" by ${item.authorName}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return ctx.reply(`Failed to save: ${message}`);
+    }
+  }
+
+  async function handleList(ctx: Context) {
+    const items = await listFavorites();
+    if (items.length === 0) {
+      return ctx.reply("No saved videos. Use /yt save <url> to add one.");
+    }
+
+    const lines = items.map((item, i) => {
+      const date = new Date(item.savedAt).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      });
+      return `${i + 1}. ${item.title}\n   ${item.authorName} · ${date}`;
+    });
+
+    return ctx.reply(lines.join("\n\n"));
+  }
+
+  async function handlePick(ctx: Context, rest: string) {
+    const parts = rest.split(/\s+/).filter(Boolean);
+    const index = Number(parts[0]);
+    if (!index || index < 1) {
+      return ctx.reply("Usage: /yt pick <#> [mode]");
+    }
+
+    const mode: YouTubeMode = VALID_MODES.has(parts[1] as YouTubeMode)
+      ? (parts[1] as YouTubeMode)
+      : "full";
+
+    const item = await getFavoriteByIndex(index);
+    if (!item) {
+      return ctx.reply(`No saved video at #${index}. Use /yt list to see your list.`);
+    }
+
+    await processOneUrl(ctx, item.url, mode);
+  }
+
+  async function handleRemove(ctx: Context, rest: string) {
+    const index = Number(rest.trim());
+    if (!index || index < 1) {
+      return ctx.reply("Usage: /yt rm <#>");
+    }
+
+    const removed = await removeFavoriteByIndex(index);
+    if (!removed) {
+      return ctx.reply(`No saved video at #${index}. Use /yt list to see your list.`);
+    }
+
+    return ctx.reply(`Removed: "${removed.title}"`);
   }
 
   async function processOneUrl(ctx: Context, url: string, mode: YouTubeMode) {

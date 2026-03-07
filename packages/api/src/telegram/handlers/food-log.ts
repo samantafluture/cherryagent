@@ -98,6 +98,7 @@ function scaleNutrition(base: NutritionData, portion: number): NutritionData {
     protein: base.protein != null ? Math.round(base.protein * portion) : undefined,
     carbs: base.carbs != null ? Math.round(base.carbs * portion) : undefined,
     fat: base.fat != null ? Math.round(base.fat * portion) : undefined,
+    saturatedFat: base.saturatedFat != null ? Math.round(base.saturatedFat * portion) : undefined,
   };
 }
 
@@ -446,6 +447,7 @@ export function createFoodLogHandlers(deps: FoodLogDeps) {
         protein: scaled.protein ?? 0,
         carbs: scaled.carbs ?? 0,
         fat: scaled.fat ?? 0,
+        saturatedFat: scaled.saturatedFat,
         mealType,
       },
       { taskId: "telegram", permissions: [] },
@@ -563,7 +565,7 @@ function formatNutritionSummary(
     `${sourceLabel[source] ?? ""} <b>${n.foodName}</b>${n.brand ? ` (${n.brand})` : ""}`,
     "",
     `${n.calories} cal`,
-    `${n.protein ?? 0}g protein | ${n.carbs ?? 0}g carbs | ${n.fat ?? 0}g fat`,
+    `${n.protein ?? 0}g protein | ${n.carbs ?? 0}g carbs | ${n.fat ?? 0}g fat${n.saturatedFat != null ? ` (${n.saturatedFat}g sat)` : ""}`,
   ];
 
   if (portion !== 1) {

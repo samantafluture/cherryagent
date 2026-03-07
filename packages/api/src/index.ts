@@ -1,7 +1,7 @@
 import { createServer } from "./server.js";
 import { createBot } from "./telegram/bot.js";
 import { GeminiProvider, GroqWhisperClient } from "@cherryagent/core";
-import { FitbitAuth, getMediaConfig, startMediaCleanup } from "@cherryagent/tools";
+import { FitbitAuth, getMediaConfig, startMediaCleanup, startWeeklyReport } from "@cherryagent/tools";
 
 const PORT = parseInt(process.env["PORT"] ?? "3000", 10);
 const HOST = process.env["HOST"] ?? "0.0.0.0";
@@ -43,10 +43,32 @@ async function main() {
   await server.listen({ port: PORT, host: HOST });
   console.log(`CherryAgent API listening on ${HOST}:${PORT}`);
 
+  // Start weekly saturated fat report (Monday 8 AM)
+  const telegramChatId = requireEnv("TELEGRAM_CHAT_ID");
+  const botToken = requireEnv("TELEGRAM_BOT_TOKEN");
+  const weeklyReportTimer = startWeeklyReport({
+    fitbitAuth,
+    timezone: process.env.USER_TIMEZONE,
+    sendMessage: async (html) => {
+      await fetch(
+        `https://api.telegram.org/bot${botToken}/sendMessage`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: telegramChatId,
+            text: html,
+            parse_mode: "HTML",
+          }),
+        },
+      );
+    },
+  });
+
   // Start Telegram bot (long polling for local dev)
   const bot = createBot({
-    token: requireEnv("TELEGRAM_BOT_TOKEN"),
-    authorizedChatId: requireEnv("TELEGRAM_CHAT_ID"),
+    token: botToken,
+    authorizedChatId: telegramChatId,
     gemini,
     fitbitAuth,
     whisper,
@@ -61,6 +83,7 @@ async function main() {
   const shutdown = async () => {
     console.log("Shutting down...");
     clearInterval(cleanupTimer);
+    clearInterval(weeklyReportTimer);
     await bot.stop();
     await server.close();
     process.exit(0);

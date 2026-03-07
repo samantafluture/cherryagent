@@ -38,3 +38,12 @@ export type ProgressStep =
   | "transcribing"
   | "generating_notes"
   | "done";
+
+export interface FavoriteItem {
+  id: number;
+  url: string;
+  title: string;
+  authorName: string;
+  thumbnailUrl?: string;
+  savedAt: number;
+}

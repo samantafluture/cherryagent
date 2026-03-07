@@ -27,6 +27,7 @@ export function createFitbitLogFoodTool(
         protein: { type: "number", description: "Protein in grams" },
         carbs: { type: "number", description: "Carbohydrates in grams" },
         fat: { type: "number", description: "Fat in grams" },
+        saturatedFat: { type: "number", description: "Saturated fat in grams" },
         mealType: {
           type: "string",
           enum: [
@@ -57,6 +58,7 @@ export function createFitbitLogFoodTool(
       const protein = params.protein as number | undefined;
       const carbs = params.carbs as number | undefined;
       const fat = params.fat as number | undefined;
+      const saturatedFat = params.saturatedFat as number | undefined;
       const mealType = (params.mealType as string) ?? "Anytime";
       const amount = (params.amount as number) ?? 1;
 
@@ -93,6 +95,8 @@ export function createFitbitLogFoodTool(
         body.append("totalCarbohydrate", String(Math.round(carbs)));
       if (fat != null)
         body.append("totalFat", String(Math.round(fat)));
+      if (saturatedFat != null)
+        body.append("saturatedFat", String(Math.round(saturatedFat)));
 
       const res = await fetch(
         "https://api.fitbit.com/1/user/-/foods/log.json",

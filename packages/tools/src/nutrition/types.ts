@@ -6,6 +6,7 @@ export interface NutritionData {
   protein?: number;
   carbs?: number;
   fat?: number;
+  saturatedFat?: number;
   mealType?:
     | "Breakfast"
     | "Morning Snack"

@@ -15,6 +15,10 @@ export { barcodeLookupTool } from "./nutrition/barcode-lookup.js";
 // Fitbit
 export { FitbitAuth } from "./fitbit/auth.js";
 export { createFitbitLogFoodTool } from "./fitbit/food-log.js";
+export { FitbitFoodLogReader } from "./fitbit/food-log-reader.js";
+export type { DailySummary, WeeklySummary } from "./fitbit/food-log-reader.js";
+export { formatOnDemandReport, formatWeeklyReport } from "./fitbit/sat-fat-report.js";
+export { startWeeklyReport } from "./fitbit/weekly-scheduler.js";
 
 // Media
 export type {
@@ -24,6 +28,7 @@ export type {
   AudioExtractionResult,
   PipelineResult,
   ProgressStep,
+  FavoriteItem,
 } from "./media/types.js";
 export type { MediaConfig } from "./media/config.js";
 export { getMediaConfig } from "./media/config.js";
@@ -33,3 +38,9 @@ export { extractAudio } from "./media/extract-audio.js";
 export { startMediaCleanup, runCleanup } from "./media/cleanup.js";
 export { runYouTubePipeline } from "./media/youtube-pipeline.js";
 export type { PipelineDeps } from "./media/youtube-pipeline.js";
+export {
+  addFavorite,
+  listFavorites,
+  getFavoriteByIndex,
+  removeFavoriteByIndex,
+} from "./media/yt-favorites.js";

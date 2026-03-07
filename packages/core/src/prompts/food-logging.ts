@@ -14,6 +14,7 @@ Return JSON only:
   "protein": number (grams),
   "carbs": number (grams),
   "fat": number (grams),
+  "saturatedFat": number (grams),
   "mealType": "Breakfast" | "Lunch" | "Dinner" | "Anytime" | null,
   "confidence": "high" | "medium" | "low",
   "notes": "any assumptions made"
@@ -37,6 +38,7 @@ Return JSON only:
   "protein": number (grams per serving),
   "carbs": number (grams per serving),
   "fat": number (grams per serving),
+  "saturatedFat": number (grams per serving),
   "confidence": "high" | "medium" | "low"
 }
 
@@ -58,6 +60,7 @@ Return JSON only:
   "protein": number (grams),
   "carbs": number (grams),
   "fat": number (grams),
+  "saturatedFat": number (grams),
   "confidence": "high" | "medium" | "low",
   "items": ["item 1 (~Xcal)", "item 2 (~Xcal)"],
   "notes": "assumptions about portions"
@@ -84,6 +87,7 @@ Return JSON only:
   "protein": number (grams),
   "carbs": number (grams),
   "fat": number (grams),
+  "saturatedFat": number (grams),
   "confidence": "high" | "medium" | "low",
   "notes": "what was corrected"
 }`;

@@ -2,6 +2,7 @@ import { Bot } from "grammy";
 import { authMiddleware } from "./middleware.js";
 import { createFoodLogHandlers } from "./handlers/food-log.js";
 import { createYouTubeHandlers } from "./handlers/youtube.js";
+import { createReportHandlers } from "./handlers/report.js";
 import type { GeminiProvider, GroqWhisperClient } from "@cherryagent/core";
 import type { FitbitAuth, MediaConfig } from "@cherryagent/tools";
 
@@ -26,6 +27,10 @@ export function createBot(deps: BotDeps) {
     botToken: deps.token,
   });
 
+  const reportHandlers = createReportHandlers({
+    fitbitAuth: deps.fitbitAuth,
+  });
+
   const ytHandlers = createYouTubeHandlers({
     whisper: deps.whisper,
     gemini: deps.gemini,
@@ -43,6 +48,7 @@ export function createBot(deps: BotDeps) {
     );
   });
   bot.command("yt", ytHandlers.handleYtCommand);
+  bot.command("report", reportHandlers.handleReportCommand);
 
   // Photo handler (label, food photo, or barcode photo)
   bot.on("message:photo", foodHandlers.handlePhoto);
