@@ -29,9 +29,12 @@ export async function downloadVideo(opts: DownloadOptions): Promise<DownloadResu
   const slug = slugify(title);
   const timestamp = Date.now();
 
+  const cookiesArgs = config.cookiesFile ? ["--cookies", config.cookiesFile] : [];
+
   if (mode === "audio") {
     const outputPath = join(config.mediaDir, `${slug}_${timestamp}.mp3`);
     const args = [
+      ...cookiesArgs,
       "-f", "ba/b",  // best audio, fallback to best combined
       "-x",
       "--audio-format", "mp3",
@@ -52,6 +55,7 @@ export async function downloadVideo(opts: DownloadOptions): Promise<DownloadResu
   const h = config.videoMaxHeight;
   const outputPath = join(config.mediaDir, `${slug}_${timestamp}.mp4`);
   const args = [
+    ...cookiesArgs,
     "-f", `bv[height<=${h}][ext=mp4]+ba[ext=m4a]/b[height<=${h}][ext=mp4]/b[height<=${h}]`,
     "--merge-output-format", "mp4",
     "--no-playlist",
