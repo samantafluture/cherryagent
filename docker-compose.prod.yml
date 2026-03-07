@@ -11,6 +11,7 @@ services:
     volumes:
       - cherryagent-data:/home/node/.cherryagent
       - cherryagent-media:/opt/cherry-agent/media
+      - ./cookies.txt:/app/cookies.txt:ro
 
 networks:
   infra-net:

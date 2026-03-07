@@ -7,6 +7,7 @@ export interface MediaConfig {
   notesRetentionDays: number;
   videoMaxHeight: number;
   audioBitrate: string;
+  cookiesFile?: string;
 }
 
 export function getMediaConfig(): MediaConfig {
@@ -18,5 +19,6 @@ export function getMediaConfig(): MediaConfig {
     notesRetentionDays: parseInt(process.env["NOTES_RETENTION_DAYS"] ?? "30", 10),
     videoMaxHeight: parseInt(process.env["VIDEO_MAX_HEIGHT"] ?? "480", 10),
     audioBitrate: process.env["AUDIO_BITRATE"] ?? "128k",
+    cookiesFile: process.env["YTDLP_COOKIES_FILE"],
   };
 }
