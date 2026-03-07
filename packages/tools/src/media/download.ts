@@ -15,6 +15,11 @@ async function getWritableCookiesArgs(config: MediaConfig): Promise<string[]> {
   return ["--cookies", tempCookies];
 }
 
+/** Common args for yt-dlp: JS runtime for n challenge + cookies */
+async function baseArgs(config: MediaConfig): Promise<string[]> {
+  return ["--js-runtimes", "nodejs", ...(await getWritableCookiesArgs(config))];
+}
+
 function slugify(title: string): string {
   return title
     .toLowerCase()
@@ -37,12 +42,12 @@ export async function downloadVideo(opts: DownloadOptions): Promise<DownloadResu
   const slug = slugify(title);
   const timestamp = Date.now();
 
-  const cookiesArgs = await getWritableCookiesArgs(config);
+  const common = await baseArgs(config);
 
   if (mode === "audio") {
     const outputPath = join(config.mediaDir, `${slug}_${timestamp}.mp3`);
     const args = [
-      ...cookiesArgs,
+      ...common,
       "-f", "ba/b",  // best audio, fallback to best combined
       "-x",
       "--audio-format", "mp3",
@@ -63,7 +68,7 @@ export async function downloadVideo(opts: DownloadOptions): Promise<DownloadResu
   const h = config.videoMaxHeight;
   const outputPath = join(config.mediaDir, `${slug}_${timestamp}.mp4`);
   const args = [
-    ...cookiesArgs,
+    ...common,
     "-S", `res:${h}`,
     "--merge-output-format", "mp4",
     "--no-playlist",
