@@ -38,6 +38,7 @@ interface PendingLog {
   portion: number;
   selectedMeal?: string;
   confirmationMessageId?: number;
+  waitingForName?: boolean;
   createdAt: number;
 }
 
@@ -121,6 +122,7 @@ function buildConfirmationKeyboard(
   }));
 
   const actionRow = [
+    { text: "Edit name", callback_data: "edit_name" },
     { text: "Log it", callback_data: "food_confirm" },
     { text: "Cancel", callback_data: "food_cancel" },
   ];
@@ -154,11 +156,16 @@ export function createFoodLogHandlers(deps: FoodLogDeps) {
 
     console.log(`[food-log] Text received: "${text}"`);
 
+    // Check if we're waiting for a name edit
+    const chatId = String(ctx.chat!.id);
+    const pending = getPending(chatId);
+    if (pending?.waitingForName) {
+      return handleNameEdit(ctx, pending, text);
+    }
+
     // Check if this is a reply to a confirmation message (correction flow)
     const replyTo = ctx.message.reply_to_message;
     if (replyTo) {
-      const chatId = String(ctx.chat!.id);
-      const pending = getPending(chatId);
       if (pending?.confirmationMessageId === replyTo.message_id) {
         return handleCorrection(ctx, pending, text);
       }
@@ -193,11 +200,13 @@ export function createFoodLogHandlers(deps: FoodLogDeps) {
       );
     }
 
-    if (!nutrition.foodName || !nutrition.calories) {
+    if (!nutrition.calories) {
       return ctx.reply(
         "Couldn't identify the food. Try being more specific, e.g. '150g grilled chicken breast'",
       );
     }
+
+    if (!nutrition.foodName) nutrition.foodName = "Unknown food";
 
     return showConfirmation(ctx, nutrition, "text");
   }
@@ -376,6 +385,14 @@ export function createFoodLogHandlers(deps: FoodLogDeps) {
       return ctx.editMessageText("Cancelled.");
     }
 
+    // ── Edit name ──
+    if (data === "edit_name") {
+      pending.waitingForName = true;
+      setPending(chatId, pending);
+      await ctx.answerCallbackQuery();
+      return ctx.reply("Send the new name for this food:");
+    }
+
     // ── Portion selection ──
     if (data.startsWith("portion_")) {
       const newPortion = Number(data.replace("portion_", ""));
@@ -479,9 +496,11 @@ export function createFoodLogHandlers(deps: FoodLogDeps) {
       return ctx.reply("Couldn't parse the correction. Try again?");
     }
 
-    if (!corrected.foodName || !corrected.calories) {
+    if (!corrected.calories) {
       return ctx.reply("Couldn't apply the correction. Try being more specific.");
     }
+
+    if (!corrected.foodName) corrected.foodName = "Unknown food";
 
     // Update pending: replace nutrition, reset portion (base values changed)
     pending.nutrition = corrected;
@@ -497,6 +516,30 @@ export function createFoodLogHandlers(deps: FoodLogDeps) {
       {
         parse_mode: "HTML",
         reply_markup: buildConfirmationKeyboard(1, pending.selectedMeal),
+      },
+    );
+  }
+
+  async function handleNameEdit(
+    ctx: Context,
+    pending: PendingLog,
+    newName: string,
+  ) {
+    const chatId = String(ctx.chat!.id);
+    pending.nutrition.foodName = newName.trim();
+    pending.waitingForName = false;
+    setPending(chatId, pending);
+
+    const scaled = scaleNutrition(pending.nutrition, pending.portion);
+    const msg = formatNutritionSummary(scaled, pending.source, pending.portion);
+
+    await ctx.api.editMessageText(
+      chatId,
+      pending.confirmationMessageId!,
+      msg,
+      {
+        parse_mode: "HTML",
+        reply_markup: buildConfirmationKeyboard(pending.portion, pending.selectedMeal),
       },
     );
   }
