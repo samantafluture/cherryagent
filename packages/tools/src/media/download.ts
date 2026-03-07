@@ -17,7 +17,7 @@ async function getWritableCookiesArgs(config: MediaConfig): Promise<string[]> {
 
 /** Common args for yt-dlp: JS runtime for n challenge + cookies */
 async function baseArgs(config: MediaConfig): Promise<string[]> {
-  return ["--js-runtimes", "nodejs", ...(await getWritableCookiesArgs(config))];
+  return ["--js-runtimes", "node", ...(await getWritableCookiesArgs(config))];
 }
 
 function slugify(title: string): string {
