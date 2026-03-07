@@ -9,8 +9,14 @@ export type {
 export { ToolRegistry } from "./registry.js";
 
 // Nutrition
-export type { NutritionData } from "./nutrition/types.js";
+export type { NutritionData, FoodFavorite } from "./nutrition/types.js";
 export { barcodeLookupTool } from "./nutrition/barcode-lookup.js";
+export {
+  addFoodFavorite,
+  listFoodFavorites,
+  getFoodFavoriteByIndex,
+  removeFoodFavoriteByIndex,
+} from "./nutrition/food-favorites.js";
 
 // Fitbit
 export { FitbitAuth } from "./fitbit/auth.js";

@@ -11,6 +11,10 @@ import {
   barcodeLookupTool,
   createFitbitLogFoodTool,
   FitbitAuth,
+  addFoodFavorite,
+  listFoodFavorites,
+  getFoodFavoriteByIndex,
+  removeFoodFavoriteByIndex,
 } from "@cherryagent/tools";
 import type { NutritionData } from "@cherryagent/tools";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
@@ -124,6 +128,7 @@ function buildConfirmationKeyboard(
 
   const actionRow = [
     { text: "Edit name", callback_data: "edit_name" },
+    { text: "Save", callback_data: "food_save" },
     { text: "Log it", callback_data: "food_confirm" },
     { text: "Cancel", callback_data: "food_cancel" },
   ];
@@ -394,6 +399,14 @@ export function createFoodLogHandlers(deps: FoodLogDeps) {
       return ctx.reply("Send the new name for this food:");
     }
 
+    // ── Save as favorite ──
+    if (data === "food_save") {
+      const { alreadyExisted } = await addFoodFavorite(pending.nutrition);
+      return ctx.answerCallbackQuery({
+        text: alreadyExisted ? "Already saved!" : "Saved!",
+      });
+    }
+
     // ── Portion selection ──
     if (data.startsWith("portion_")) {
       const newPortion = Number(data.replace("portion_", ""));
@@ -546,7 +559,51 @@ export function createFoodLogHandlers(deps: FoodLogDeps) {
     );
   }
 
-  return { handleText, handlePhoto, handleCallback };
+  // ─── /fav command ───
+
+  async function handleFavCommand(ctx: Context) {
+    const text = ctx.message?.text ?? "";
+    const args = text.replace(/^\/fav\s*/, "").trim();
+
+    // /fav rm <n>
+    if (args.startsWith("rm ")) {
+      const index = Number(args.replace("rm ", "").trim());
+      if (!index || index < 1) {
+        return ctx.reply("Usage: /fav rm <number>");
+      }
+      const removed = await removeFoodFavoriteByIndex(index);
+      if (!removed) {
+        return ctx.reply(`No favorite at #${index}.`);
+      }
+      return ctx.reply(`Removed: ${removed.nutrition.foodName}`);
+    }
+
+    // /fav <n> — log a favorite
+    if (/^\d+$/.test(args)) {
+      const index = Number(args);
+      const fav = await getFoodFavoriteByIndex(index);
+      if (!fav) {
+        return ctx.reply(`No favorite at #${index}.`);
+      }
+      return showConfirmation(ctx, fav.nutrition, "text");
+    }
+
+    // /fav — list all
+    const favorites = await listFoodFavorites();
+    if (favorites.length === 0) {
+      return ctx.reply("No saved foods yet. Log a food and tap Save to add one.");
+    }
+
+    const lines = ["<b>Saved foods:</b>", ""];
+    for (let i = 0; i < favorites.length; i++) {
+      const f = favorites[i]!;
+      lines.push(`${i + 1}. ${f.nutrition.foodName} (${f.nutrition.calories} cal)`);
+    }
+    lines.push("", "Use /fav <number> to log one.");
+    return ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
+  }
+
+  return { handleText, handlePhoto, handleCallback, handleFavCommand };
 }
 
 function formatNutritionSummary(

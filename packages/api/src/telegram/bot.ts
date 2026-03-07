@@ -47,6 +47,7 @@ export function createBot(deps: BotDeps) {
       `Open this link to connect Fitbit:\n${url}\n\nAfter authorizing, the callback will save your tokens automatically.`,
     );
   });
+  bot.command("fav", foodHandlers.handleFavCommand);
   bot.command("yt", ytHandlers.handleYtCommand);
   bot.command("report", reportHandlers.handleReportCommand);
 

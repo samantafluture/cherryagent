@@ -18,3 +18,9 @@ export interface NutritionData {
   items?: string[];
   notes?: string;
 }
+
+export interface FoodFavorite {
+  id: number;
+  nutrition: NutritionData;
+  savedAt: number;
+}
