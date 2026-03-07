@@ -625,7 +625,7 @@ export function createFoodLogHandlers(deps: FoodLogDeps) {
       const f = favorites[i]!;
       lines.push(`${i + 1}. ${f.nutrition.foodName} (${f.nutrition.calories} cal)`);
     }
-    lines.push("", "Use /fav <number> to log one.");
+    lines.push("", "Use /fav &lt;#&gt; to log one.");
     return ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
   }
 
