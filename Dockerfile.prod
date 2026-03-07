@@ -37,9 +37,9 @@ FROM node:20-alpine AS production
 
 RUN corepack enable && corepack prepare pnpm@10.27.0 --activate
 
-# Install ffmpeg, python3, and yt-dlp for YouTube workflow
+# Install ffmpeg, python3, yt-dlp, and yt-dlp-ejs (JS runtime for YouTube n challenge)
 RUN apk add --no-cache ffmpeg python3 py3-pip \
-  && pip3 install --no-cache-dir --break-system-packages yt-dlp
+  && pip3 install --no-cache-dir --break-system-packages yt-dlp yt-dlp-ejs
 
 WORKDIR /app
 
