@@ -18,9 +18,11 @@ import { join, dirname } from "node:path";
 
 // ─── Constants ───
 
-const PORTION_OPTIONS = [0.5, 1, 1.5, 2, 3];
+const PORTION_OPTIONS = [1/6, 0.25, 0.5, 1, 1.5, 2, 3];
 
 const PORTION_LABELS: Record<number, string> = {
+  [1/6]: "1/6x",
+  0.25: "1/4x",
   0.5: "1/2x",
   1: "1x",
   1.5: "1.5x",
