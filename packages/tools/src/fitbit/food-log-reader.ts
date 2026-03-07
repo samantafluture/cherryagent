@@ -1,4 +1,5 @@
 import type { FitbitAuth } from "./auth.js";
+import { getDailySaturatedFat } from "../nutrition/sat-fat-tracker.js";
 
 export interface DailySummary {
   date: string;
@@ -48,11 +49,15 @@ export class FitbitFoodLogReader {
   }
 
   async getDailySummary(date: string): Promise<DailySummary> {
-    const data = await this.getFoodLogsForDate(date);
-    const satFat = data.summary.saturatedFat ?? 0;
+    const [data, localSatFat] = await Promise.all([
+      this.getFoodLogsForDate(date),
+      getDailySaturatedFat(date),
+    ]);
+    // Use local tracker for sat fat (Fitbit API doesn't include it in summary)
+    const satFat = localSatFat;
     return {
       date,
-      saturatedFatGrams: satFat,
+      saturatedFatGrams: Math.round(satFat * 10) / 10,
       totalCalories: data.summary.calories ?? 0,
       rating: rate(satFat),
     };

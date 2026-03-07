@@ -17,6 +17,11 @@ export {
   getFoodFavoriteByIndex,
   removeFoodFavoriteByIndex,
 } from "./nutrition/food-favorites.js";
+export {
+  trackSaturatedFat,
+  getDailySaturatedFat,
+  getWeeklySaturatedFat,
+} from "./nutrition/sat-fat-tracker.js";
 
 // Fitbit
 export { FitbitAuth } from "./fitbit/auth.js";

@@ -47,9 +47,18 @@ export function createBot(deps: BotDeps) {
       `Open this link to connect Fitbit:\n${url}\n\nAfter authorizing, the callback will save your tokens automatically.`,
     );
   });
+  bot.command("food", foodHandlers.handleFoodCommand);
   bot.command("fav", foodHandlers.handleFavCommand);
   bot.command("yt", ytHandlers.handleYtCommand);
   bot.command("report", reportHandlers.handleReportCommand);
+
+  // Set bot command menu
+  bot.api.setMyCommands([
+    { command: "food", description: "Food logger help & commands" },
+    { command: "fav", description: "Saved foods — list, log, or remove" },
+    { command: "report", description: "Saturated fat report (today + weekly)" },
+    { command: "yt", description: "YouTube — download, transcribe, notes" },
+  ]);
 
   // Photo handler (label, food photo, or barcode photo)
   bot.on("message:photo", foodHandlers.handlePhoto);

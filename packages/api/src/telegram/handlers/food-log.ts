@@ -15,6 +15,7 @@ import {
   listFoodFavorites,
   getFoodFavoriteByIndex,
   removeFoodFavoriteByIndex,
+  trackSaturatedFat,
 } from "@cherryagent/tools";
 import type { NutritionData } from "@cherryagent/tools";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
@@ -470,6 +471,13 @@ export function createFoodLogHandlers(deps: FoodLogDeps) {
     deletePending(chatId);
 
     if (result.success) {
+      // Track saturated fat locally (Fitbit API doesn't return it in daily summary)
+      if (scaled.saturatedFat != null && scaled.saturatedFat > 0) {
+        const today = new Date().toLocaleDateString("en-CA", {
+          timeZone: process.env.USER_TIMEZONE ?? "America/Toronto",
+        });
+        await trackSaturatedFat(today, scaled.foodName, scaled.saturatedFat);
+      }
       await ctx.answerCallbackQuery({ text: "Logged!" });
       return ctx.editMessageText(`Logged: ${result.output}`);
     } else {
@@ -559,11 +567,29 @@ export function createFoodLogHandlers(deps: FoodLogDeps) {
     );
   }
 
+  // ─── /food help command ───
+
+  async function handleFoodCommand(ctx: Context) {
+    return ctx.reply(
+      "<b>Food Logger</b>\n\n" +
+      "<b>Log food:</b>\n" +
+      "  Text — type a description (e.g. \"2 eggs and toast\")\n" +
+      "  Photo — send a photo of food, label, or barcode\n" +
+      "  Barcode — type 8-13 digit barcode number\n\n" +
+      "<b>Favorites:</b>\n" +
+      "  /fav — list saved foods\n" +
+      "  /fav &lt;#&gt; — log a saved food\n" +
+      "  /fav rm &lt;#&gt; — remove a saved food\n\n" +
+      "<b>Reports:</b>\n" +
+      "  /report — saturated fat report (today + weekly)",
+      { parse_mode: "HTML" },
+    );
+  }
+
   // ─── /fav command ───
 
   async function handleFavCommand(ctx: Context) {
-    const text = ctx.message?.text ?? "";
-    const args = text.replace(/^\/fav\s*/, "").trim();
+    const args = ((ctx.match as string | undefined) ?? "").trim();
 
     // /fav rm <n>
     if (args.startsWith("rm ")) {
@@ -603,7 +629,7 @@ export function createFoodLogHandlers(deps: FoodLogDeps) {
     return ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
   }
 
-  return { handleText, handlePhoto, handleCallback, handleFavCommand };
+  return { handleText, handlePhoto, handleCallback, handleFavCommand, handleFoodCommand };
 }
 
 function formatNutritionSummary(
