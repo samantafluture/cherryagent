@@ -225,17 +225,20 @@ export function createYouTubeHandlers(deps: YouTubeDeps) {
 
       // Deliver notes
       if (result.notes) {
+        // Send as text message (truncate if too long)
         if (result.notes.length <= 4000) {
           await ctx.reply(result.notes);
         } else {
-          // Send as a document
-          const notesBuffer = Buffer.from(result.notes, "utf-8");
-          const notesFilename = `${sanitizeFilename(title)} - Notes.md`;
-          const file = new InputFile(notesBuffer, notesFilename);
-          await ctx.replyWithDocument(file, {
-            caption: `Notes for "${title}"`,
-          });
+          await ctx.reply(result.notes.slice(0, 4000) + "\n\n…(truncated, see full notes in file)");
         }
+
+        // Always send as .md file
+        const notesBuffer = Buffer.from(result.notes, "utf-8");
+        const notesFilename = `${sanitizeFilename(title)} - Notes.md`;
+        const file = new InputFile(notesBuffer, notesFilename);
+        await ctx.replyWithDocument(file, {
+          caption: `Notes for "${title}"`,
+        });
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
