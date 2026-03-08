@@ -14,6 +14,8 @@ import {
   listFavorites,
   getFavoriteByIndex,
   removeFavoriteByIndex,
+  logCost,
+  checkSpendWarning,
 } from "@cherryagent/tools";
 import type { YouTubeMode, MediaConfig, ProgressStep } from "@cherryagent/tools";
 
@@ -36,6 +38,7 @@ interface YouTubeDeps {
   whisper: GroqWhisperClient;
   gemini: GeminiProvider;
   mediaConfig: MediaConfig;
+  costConfig?: { timezone?: string; dailyCapUsd?: number; monthlyCapUsd?: number };
 }
 
 export function createYouTubeHandlers(deps: YouTubeDeps) {
@@ -210,6 +213,13 @@ export function createYouTubeHandlers(deps: YouTubeDeps) {
       ].filter(Boolean).join("\n");
 
       await ctx.api.editMessageText(chatId, progressMsg.message_id, doneText);
+
+      // Log cost
+      if (result.costUsd > 0) {
+        await logCost("youtube", "gemini+groq", result.costUsd, `${mode}: ${result.metadata.title}`, deps.costConfig?.timezone);
+        const warning = await checkSpendWarning(deps.costConfig);
+        if (warning) await ctx.reply(warning);
+      }
 
       const title = result.metadata.title;
 

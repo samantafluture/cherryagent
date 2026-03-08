@@ -16,6 +16,8 @@ import {
   getFoodFavoriteByIndex,
   removeFoodFavoriteByIndex,
   trackSaturatedFat,
+  logCost,
+  checkSpendWarning,
 } from "@cherryagent/tools";
 import type { NutritionData } from "@cherryagent/tools";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
@@ -143,10 +145,26 @@ interface FoodLogDeps {
   gemini: GeminiProvider;
   fitbitAuth: FitbitAuth;
   botToken: string;
+  costConfig?: { timezone?: string; dailyCapUsd?: number; monthlyCapUsd?: number };
 }
 
 export function createFoodLogHandlers(deps: FoodLogDeps) {
   const { gemini, fitbitAuth, botToken } = deps;
+
+  async function trackGeminiCost(
+    usage: { inputTokens: number; outputTokens: number },
+    detail: string,
+    ctx: Context,
+  ) {
+    const cost =
+      (usage.inputTokens / 1_000_000) * gemini.inputCostPer1M +
+      (usage.outputTokens / 1_000_000) * gemini.outputCostPer1M;
+    if (cost > 0) {
+      await logCost("food", "gemini", cost, detail, deps.costConfig?.timezone);
+      const warning = await checkSpendWarning(deps.costConfig);
+      if (warning) await ctx.reply(warning);
+    }
+  }
   const fitbitLogTool = createFitbitLogFoodTool(
     fitbitAuth,
     process.env.USER_TIMEZONE,
@@ -191,6 +209,7 @@ export function createFoodLogHandlers(deps: FoodLogDeps) {
       messages: [{ role: "user", content: text }],
       jsonMode: true,
     });
+    await trackGeminiCost(response.usage, "food parse", ctx);
 
     if (!response.content) {
       return ctx.reply(
@@ -267,6 +286,7 @@ export function createFoodLogHandlers(deps: FoodLogDeps) {
       mimeType: "image/jpeg",
       jsonMode: true,
     });
+    await trackGeminiCost(classifyResponse.usage, "image classify", ctx);
 
     let classification: { type?: string };
     try {
@@ -286,6 +306,7 @@ export function createFoodLogHandlers(deps: FoodLogDeps) {
           imageBase64: base64,
           mimeType: "image/jpeg",
         });
+        await trackGeminiCost(barcodeResponse.usage, "barcode read", ctx);
         const barcodeNumber = barcodeResponse.content
           ?.trim()
           .replace(/\D/g, "");
@@ -305,6 +326,7 @@ export function createFoodLogHandlers(deps: FoodLogDeps) {
           mimeType: "image/jpeg",
           jsonMode: true,
         });
+        await trackGeminiCost(labelResponse.usage, "label extract", ctx);
         let labelNutrition: NutritionData;
         try {
           labelNutrition = JSON.parse(
@@ -326,6 +348,7 @@ export function createFoodLogHandlers(deps: FoodLogDeps) {
           mimeType: "image/jpeg",
           jsonMode: true,
         });
+        await trackGeminiCost(foodResponse.usage, "food estimate", ctx);
         let foodNutrition: NutritionData;
         try {
           foodNutrition = JSON.parse(
@@ -507,6 +530,7 @@ export function createFoodLogHandlers(deps: FoodLogDeps) {
       ],
       jsonMode: true,
     });
+    await trackGeminiCost(response.usage, "food correction", ctx);
 
     if (!response.content) {
       return ctx.reply("Couldn't process the correction. Try again?");

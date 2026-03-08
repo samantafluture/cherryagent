@@ -3,6 +3,7 @@ import { authMiddleware } from "./middleware.js";
 import { createFoodLogHandlers } from "./handlers/food-log.js";
 import { createYouTubeHandlers } from "./handlers/youtube.js";
 import { createReportHandlers } from "./handlers/report.js";
+import { createCostHandlers } from "./handlers/cost.js";
 import type { GeminiProvider, GroqWhisperClient } from "@cherryagent/core";
 import type { FitbitAuth, MediaConfig } from "@cherryagent/tools";
 
@@ -21,10 +22,19 @@ export function createBot(deps: BotDeps) {
   // Security: only respond to Sam's chat
   bot.use(authMiddleware(deps.authorizedChatId));
 
+  const dailyCap = Number(process.env.AGENT_MAX_DAILY_SPEND_USD) || undefined;
+  const monthlyCap = Number(process.env.AGENT_MAX_MONTHLY_SPEND_USD) || undefined;
+  const costConfig = {
+    timezone: process.env.USER_TIMEZONE,
+    dailyCapUsd: dailyCap,
+    monthlyCapUsd: monthlyCap,
+  };
+
   const foodHandlers = createFoodLogHandlers({
     gemini: deps.gemini,
     fitbitAuth: deps.fitbitAuth,
     botToken: deps.token,
+    costConfig,
   });
 
   const reportHandlers = createReportHandlers({
@@ -35,7 +45,10 @@ export function createBot(deps: BotDeps) {
     whisper: deps.whisper,
     gemini: deps.gemini,
     mediaConfig: deps.mediaConfig,
+    costConfig,
   });
+
+  const costHandlers = createCostHandlers(costConfig);
 
   // Commands
   bot.command("start", (ctx) =>
@@ -51,6 +64,7 @@ export function createBot(deps: BotDeps) {
   bot.command("fav", foodHandlers.handleFavCommand);
   bot.command("yt", ytHandlers.handleYtCommand);
   bot.command("report", reportHandlers.handleReportCommand);
+  bot.command("cost", costHandlers.handleCostCommand);
 
   // Set bot command menu
   bot.api.setMyCommands([
@@ -58,6 +72,7 @@ export function createBot(deps: BotDeps) {
     { command: "fav", description: "Saved foods — list, log, or remove" },
     { command: "report", description: "Saturated fat report (today + weekly)" },
     { command: "yt", description: "YouTube — download, transcribe, notes" },
+    { command: "cost", description: "AI spend report — today, week, month" },
   ]);
 
   // Photo handler (label, food photo, or barcode photo)

@@ -31,6 +31,11 @@ export type { DailySummary, WeeklySummary } from "./fitbit/food-log-reader.js";
 export { formatOnDemandReport, formatWeeklyReport } from "./fitbit/sat-fat-report.js";
 export { startWeeklyReport } from "./fitbit/weekly-scheduler.js";
 
+// Cost
+export type { CostEntry } from "./cost/cost-tracker.js";
+export { logCost, getCostsForDate, getCostsForRange, getDailyCost, getMonthlyCost } from "./cost/cost-tracker.js";
+export { formatCostReport, checkSpendWarning } from "./cost/cost-report.js";
+
 // Media
 export type {
   YouTubeMode,
