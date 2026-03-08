@@ -36,6 +36,10 @@ export type { CostEntry } from "./cost/cost-tracker.js";
 export { logCost, getCostsForDate, getCostsForRange, getDailyCost, getMonthlyCost } from "./cost/cost-tracker.js";
 export { formatCostReport, checkSpendWarning } from "./cost/cost-report.js";
 
+// Inspiration
+export { uploadToInspirationBoard } from "./inspiration/upload.js";
+export type { InspirationUploadResult } from "./inspiration/upload.js";
+
 // Media
 export type {
   YouTubeMode,

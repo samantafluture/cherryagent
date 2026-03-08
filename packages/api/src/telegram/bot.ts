@@ -4,6 +4,7 @@ import { createFoodLogHandlers } from "./handlers/food-log.js";
 import { createYouTubeHandlers } from "./handlers/youtube.js";
 import { createReportHandlers } from "./handlers/report.js";
 import { createCostHandlers } from "./handlers/cost.js";
+import { createInspirationHandlers } from "./handlers/inspiration.js";
 import type { GeminiProvider, GroqWhisperClient } from "@cherryagent/core";
 import type { FitbitAuth, MediaConfig } from "@cherryagent/tools";
 
@@ -50,6 +51,17 @@ export function createBot(deps: BotDeps) {
 
   const costHandlers = createCostHandlers(costConfig);
 
+  const surprideWebhookUrl = process.env.SURPRIDE_WEBHOOK_URL;
+  const surprideToken = process.env.SURPRIDE_WEBHOOK_TOKEN;
+  const inspoHandlers =
+    surprideWebhookUrl && surprideToken
+      ? createInspirationHandlers({
+          botToken: deps.token,
+          surprideWebhookUrl,
+          surprideToken,
+        })
+      : null;
+
   // Commands
   bot.command("start", (ctx) =>
     ctx.reply("CherryAgent ready. Send food to log or /yt for YouTube!"),
@@ -65,6 +77,9 @@ export function createBot(deps: BotDeps) {
   bot.command("yt", ytHandlers.handleYtCommand);
   bot.command("report", reportHandlers.handleReportCommand);
   bot.command("cost", costHandlers.handleCostCommand);
+  if (inspoHandlers) {
+    bot.command("inspo", inspoHandlers.handleInspoCommand);
+  }
 
   // Set bot command menu
   bot.api.setMyCommands([
@@ -73,10 +88,17 @@ export function createBot(deps: BotDeps) {
     { command: "report", description: "Saturated fat report (today + weekly)" },
     { command: "yt", description: "YouTube — download, transcribe, notes" },
     { command: "cost", description: "AI spend report — today, week, month" },
+    { command: "inspo", description: "Upload photo to Inspiration Board" },
   ]);
 
-  // Photo handler (label, food photo, or barcode photo)
-  bot.on("message:photo", foodHandlers.handlePhoto);
+  // Photo handler — route by caption
+  bot.on("message:photo", (ctx) => {
+    const caption = ctx.message.caption ?? "";
+    if (caption.startsWith("/inspo") && inspoHandlers) {
+      return inspoHandlers.handleInspoPhoto(ctx);
+    }
+    return foodHandlers.handlePhoto(ctx);
+  });
 
   // Text handler (natural language or barcode number)
   bot.on("message:text", foodHandlers.handleText);
