@@ -63,8 +63,10 @@ COPY --from=build /app/packages/api/dist/ packages/api/dist/
 RUN mkdir -p /home/node/.cherryagent /opt/cherry-agent/media \
   && chown -R node:node /home/node/.cherryagent /opt/cherry-agent/media
 
-# Trust all host-mounted repos for CherryTasks git sync
-RUN git config --system safe.directory '*'
+# Git config for CherryTasks sync
+RUN git config --system safe.directory '*' \
+  && git config --system user.email "cherryagent@samantafluture.com" \
+  && git config --system user.name "CherryAgent"
 
 USER node
 

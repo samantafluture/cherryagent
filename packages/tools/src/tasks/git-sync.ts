@@ -46,26 +46,42 @@ export async function commitAndPush(repoPath: string): Promise<GitSyncResult> {
  * Handles conflicts by keeping VPS state and stashing remote changes.
  */
 export async function pullChanges(repoPath: string): Promise<GitSyncResult> {
-  // Check for uncommitted local changes first
+  // Check for uncommitted local changes to tasks.md
   const { stdout: statusOut } = await git(repoPath, ["status", "--porcelain", ".claude/tasks.md"]);
-  if (statusOut.trim()) {
-    // Local uncommitted changes — commit them first to avoid losing work
-    await commitAndPush(repoPath);
+  const status = statusOut.trim();
+  if (status) {
+    // Only commit if the file is tracked and modified (M) or added (A), not untracked (??)
+    const isTrackedChange = status.startsWith(" M") || status.startsWith("M") || status.startsWith("A");
+    if (isTrackedChange) {
+      try {
+        await commitAndPush(repoPath);
+      } catch {
+        // If commit fails (e.g., no git identity), proceed with pull anyway
+      }
+    }
   }
 
   try {
     await git(repoPath, ["pull", "--rebase=false"]);
     return { action: "pulled", message: "Pulled latest changes" };
   } catch (err) {
-    // Merge conflict — abort and keep VPS state
     const error = err as Error & { stderr?: string };
-    if (error.stderr?.includes("CONFLICT") || error.message?.includes("CONFLICT")) {
+    const errMsg = (error.stderr ?? "") + (error.message ?? "");
+
+    // Merge conflict — abort and keep VPS state
+    if (errMsg.includes("CONFLICT")) {
       await git(repoPath, ["merge", "--abort"]).catch(() => {});
       return {
         action: "conflict",
         message: "Merge conflict detected — VPS state preserved. Remote changes need manual review.",
       };
     }
+
+    // "Already up to date" or "no tracking info" — not errors
+    if (errMsg.includes("Already up to date") || errMsg.includes("There is no tracking information")) {
+      return { action: "no-change", message: "Already up to date" };
+    }
+
     throw err;
   }
 }
