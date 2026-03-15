@@ -33,7 +33,8 @@ export function listProjects(knownSlugs?: string[]): ProjectEntry[] {
   for (const slug of slugs) {
     const repoPath = resolve(PROJECTS_BASE, slug);
     const taskFilePath = resolve(repoPath, ".claude/tasks.md");
-    if (existsSync(taskFilePath)) {
+    const gitDir = resolve(repoPath, ".git");
+    if (existsSync(taskFilePath) && existsSync(gitDir)) {
       const file = loadTaskFile(taskFilePath);
       projects.push({
         slug,
@@ -91,7 +92,8 @@ function discoverProjectSlugs(): string[] {
       try {
         if (statSync(fullPath).isDirectory()) {
           const taskFile = resolve(fullPath, ".claude/tasks.md");
-          if (existsSync(taskFile)) {
+          const gitDir = resolve(fullPath, ".git");
+          if (existsSync(taskFile) && existsSync(gitDir)) {
             slugs.push(entry);
           }
         }

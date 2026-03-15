@@ -8,6 +8,7 @@ services:
     restart: unless-stopped
     networks:
       - infra-net
+    user: "1001:1001"  # match host sam user for git repo access
     volumes:
       - cherryagent-data:/home/node/.cherryagent
       - cherryagent-media:/opt/cherry-agent/media
