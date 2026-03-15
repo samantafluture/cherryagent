@@ -1,6 +1,6 @@
 export type Priority = "P0" | "P1" | "P2";
 export type Size = "S" | "M" | "L";
-export type TaskStatus = "active" | "blocked" | "done";
+export type TaskStatus = "active" | "wip" | "blocked" | "done";
 
 export interface Subtask {
   title: string;

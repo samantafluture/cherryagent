@@ -60,6 +60,7 @@ export function updateTaskStatus(file: TaskFile, taskId: string, newStatus: Task
     task.checkbox = false;
     file.sections.blocked.tasks.push(task);
   } else {
+    // "active" or "wip" — stays in priority section
     task.checkbox = false;
     const section = getSectionForPriority(file, task.priority);
     section.tasks.push(task);
@@ -119,7 +120,7 @@ export function getAllTasks(file: TaskFile): Task[] {
 }
 
 export function getActiveTasks(file: TaskFile): Task[] {
-  return getAllTasks(file).filter((t) => t.status === "active");
+  return getAllTasks(file).filter((t) => t.status === "active" || t.status === "wip");
 }
 
 // --- helpers ---

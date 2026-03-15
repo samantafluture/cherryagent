@@ -231,6 +231,13 @@ function parseTaskLine(
     title = title.replace(dateMatch[0], "").trim();
   }
 
+  // Extract WIP marker: ⏳ wip
+  let isWip = false;
+  if (title.includes("⏳ wip") || title.includes("⏳wip")) {
+    isWip = true;
+    title = title.replace(/⏳\s*wip/, "").trim();
+  }
+
   // Extract blocked reason: 🔴 blocked: <reason>
   const blockedMatch = title.match(/🔴\s*blocked:\s*(.+)$/);
   if (blockedMatch) {
@@ -254,6 +261,7 @@ function parseTaskLine(
 
   // Determine effective status
   let status = defaultStatus;
+  if (isWip) status = "wip";
   if (blockedReason) status = "blocked";
   if (checked) status = "done";
 

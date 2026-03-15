@@ -87,6 +87,10 @@ function serializeTask(task: Task): string {
     parts.push("👤 manual");
   }
 
+  if (task.status === "wip") {
+    parts.push("⏳ wip");
+  }
+
   if (task.blockedReason) {
     parts.push(`🔴 blocked: ${task.blockedReason}`);
   }

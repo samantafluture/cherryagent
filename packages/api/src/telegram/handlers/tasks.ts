@@ -20,29 +20,19 @@ import {
   type TaskStatus,
 } from "@cherryagent/tools";
 
-// Status icons
-const STATUS_ICON: Record<string, string> = {
-  active: "➡️",
-  done: "✅",
-  blocked: "🔒",
-  wip: "⌛",
-};
-
-// Size display: t-shirt emoji in quantity
 function sizeDisplay(size?: string): string {
   if (!size) return "";
-  switch (size) {
-    case "S": return " 👕";
-    case "M": return " 👕👕";
-    case "L": return " 👕👕👕";
-    default: return "";
-  }
+  return ` - #${size.toLowerCase()}`;
 }
 
-function statusIcon(task: Task): string {
-  if (task.checkbox) return STATUS_ICON.done;
-  if (task.status === "blocked" || task.blockedReason) return STATUS_ICON.blocked;
-  return STATUS_ICON.active;
+function ownerDisplay(task: Task): string {
+  return task.manual ? " - #sam" : "";
+}
+
+function statusSuffix(task: Task): string {
+  if (task.status === "wip") return " ⏳";
+  if (task.status === "blocked" || task.blockedReason) return " 🔒";
+  return "";
 }
 
 export function createTaskHandlers() {
@@ -296,8 +286,8 @@ export function createTaskHandlers() {
         if (indices.length === 0) {
           return ctx.reply(`Usage: /task ${projectSlug} ${action} &lt;#,#,#&gt;`, { parse_mode: "HTML" });
         }
-        const statusMap = { done: "done", wip: "active", block: "blocked" } as const;
-        const emojiMap = { done: "✅", wip: "⌛", block: "🔒" };
+        const statusMap = { done: "done", wip: "wip", block: "blocked" } as const;
+        const emojiMap = { done: "✅", wip: "⏳", block: "🔒" };
         const results: string[] = [];
         for (const index of indices) {
           const task = allDisplayed[index - 1];
@@ -407,7 +397,7 @@ export function createTaskHandlers() {
 
     const statusMap: Record<string, TaskStatus> = {
       done: "done",
-      wip: "active",
+      wip: "wip",
       block: "blocked",
     };
     const newStatus = statusMap[action];
@@ -421,7 +411,7 @@ export function createTaskHandlers() {
 
     const labels: Record<string, string> = {
       done: `✅ Done: ${task.title}`,
-      wip: `⌛ WIP: ${task.title}`,
+      wip: `⏳ WIP: ${task.title}`,
       block: `🔒 Blocked: ${task.title}`,
     };
     await ctx.answerCallbackQuery({ text: labels[action] ?? action });
@@ -446,11 +436,11 @@ function getDisplayedTasks(file: TaskFile): Task[] {
 }
 
 function formatTaskLine(index: number, task: Task): string {
-  const icon = statusIcon(task);
   const size = sizeDisplay(task.size);
-  const manual = task.manual ? " 👤" : "";
+  const owner = ownerDisplay(task);
+  const suffix = statusSuffix(task);
   const blocked = task.blockedReason ? `\n   🔒 ${formatHtml(task.blockedReason)}` : "";
-  return `<b>${index}</b> - ${icon} ${formatHtml(task.title)}${size}${manual}${blocked}`;
+  return `<b>${index}</b> - ${formatHtml(task.title)}${size}${owner}${suffix}${blocked}`;
 }
 
 function buildTaskKeyboard(slug: string, tasks: Task[]) {
@@ -459,7 +449,7 @@ function buildTaskKeyboard(slug: string, tasks: Task[]) {
     const n = i + 1;
     return [
       { text: `#${n} ✅ Done`, callback_data: `task_done_${slug}_${task.id}` },
-      { text: `#${n} ⌛ WIP`, callback_data: `task_wip_${slug}_${task.id}` },
+      { text: `#${n} ⏳ WIP`, callback_data: `task_wip_${slug}_${task.id}` },
       { text: `#${n} 🔒 Block`, callback_data: `task_block_${slug}_${task.id}` },
     ];
   });
