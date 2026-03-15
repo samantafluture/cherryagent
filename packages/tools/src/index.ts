@@ -51,6 +51,8 @@ export type {
   TaskStatus,
   ProjectEntry,
   ProjectOverview,
+  GitSyncResult,
+  SyncSchedulerOpts,
 } from "./tasks/index.js";
 export {
   parseTaskFile,
@@ -68,6 +70,10 @@ export {
   getActiveTasks,
   listProjects,
   getOverview,
+  commitAndPush,
+  pullChanges,
+  pullAllProjects,
+  startSyncScheduler,
 } from "./tasks/index.js";
 
 // Media
