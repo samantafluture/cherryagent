@@ -4,6 +4,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 echo "==> Pulling latest code..."
+git clean -fd
+git checkout -- .
 git pull origin main
 
 echo "==> Building Docker image..."
