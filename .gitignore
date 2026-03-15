@@ -9,3 +9,6 @@ dist/
 /media/
 uploads/
 outputs/
+
+# Claude Code local config
+.claude/tasks.md
