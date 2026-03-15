@@ -267,7 +267,8 @@ export function createTaskHandlers() {
     }
 
     const file = loadTaskFile(project.taskFilePath);
-    const allActive = getActiveTasks(file);
+    // Use the same task list shown in the display (P0 + P1 + P2 + Blocked)
+    const allDisplayed = getDisplayedTasks(file);
 
     switch (action) {
       case "add":
@@ -297,7 +298,7 @@ export function createTaskHandlers() {
         const emojiMap = { done: "✅", wip: "⌛", block: "🔒" };
         const results: string[] = [];
         for (const index of indices) {
-          const task = allActive[index - 1];
+          const task = allDisplayed[index - 1];
           if (!task) {
             results.push(`#${index} — not found`);
             continue;
@@ -314,7 +315,7 @@ export function createTaskHandlers() {
       case "down": {
         const index = Number(parts[2]);
         if (!index) return ctx.reply(`Usage: /task ${projectSlug} ${action} &lt;#&gt;`, { parse_mode: "HTML" });
-        const task = allActive[index - 1];
+        const task = allDisplayed[index - 1];
         if (!task) return ctx.reply(`No active task at #${index}`);
         const moved = reorderTask(file, task.id, action);
         if (!moved) return ctx.reply("Can't move further in that direction.");
@@ -332,7 +333,7 @@ export function createTaskHandlers() {
         const sorted = [...indices].sort((a, b) => b - a);
         const results: string[] = [];
         for (const index of sorted) {
-          const task = allActive[index - 1];
+          const task = allDisplayed[index - 1];
           if (!task) {
             results.push(`#${index} — not found`);
             continue;
@@ -351,7 +352,7 @@ export function createTaskHandlers() {
         if (!index || !noteMatch) {
           return ctx.reply(`Usage: /task ${projectSlug} note &lt;#&gt; "Note text"`, { parse_mode: "HTML" });
         }
-        const task = allActive[index - 1];
+        const task = allDisplayed[index - 1];
         if (!task) return ctx.reply(`No active task at #${index}`);
         addTaskNote(file, task.id, noteMatch[1]);
         saveTaskFile(project.taskFilePath, file);
@@ -365,7 +366,7 @@ export function createTaskHandlers() {
         if (!index || !titleMatch) {
           return ctx.reply(`Usage: /task ${projectSlug} edit &lt;#&gt; "New title"`, { parse_mode: "HTML" });
         }
-        const task = allActive[index - 1];
+        const task = allDisplayed[index - 1];
         if (!task) return ctx.reply(`No active task at #${index}`);
         editTaskTitle(file, task.id, titleMatch[1]);
         saveTaskFile(project.taskFilePath, file);
@@ -431,6 +432,16 @@ export function createTaskHandlers() {
 }
 
 // --- Helpers ---
+
+/** Returns tasks in the same order as displayed: P0 + P1 + P2 + Blocked */
+function getDisplayedTasks(file: TaskFile): Task[] {
+  return [
+    ...file.sections.activeP0.tasks,
+    ...file.sections.activeP1.tasks,
+    ...file.sections.activeP2.tasks,
+    ...file.sections.blocked.tasks,
+  ];
+}
 
 function formatTaskLine(index: number, task: Task): string {
   const icon = statusIcon(task);
