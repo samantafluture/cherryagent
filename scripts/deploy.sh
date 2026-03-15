@@ -4,8 +4,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 echo "==> Pulling latest code..."
-git clean -fd
-git checkout -- .
+git clean -fd --exclude=.claude/tasks.md
+git checkout -- . ':!.claude/tasks.md'
 git pull origin main
 
 echo "==> Building Docker image..."

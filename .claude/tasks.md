@@ -1,27 +1,25 @@
-# Tasks
+# Project: CherryAgent
 
-## Fix YouTube Cookie Error
+> Last synced to repo: —
+> Last agent update: 2026-03-15
 
-**Status:** Open
+## Active Sprint
 
-yt-dlp is failing with a bot detection / authentication error when downloading YouTube videos.
+### P0 — Must do now
 
-**Error log:**
+### P1 — Should do this week
 
-```
-Failed to process video:
-Command failed: yt-dlp --js-runtimes node --cookies /home/node/.cherryagent/media/.cookies.tmp.txt -f ba/b -x --audio-format mp3 --audio-quality 128K --no-playlist --no-warnings -o /home/node/.cherryagent/media/if_i_started_youtube_from_scratch_in_2026_i_d_do_this_1773582862369.mp3 https://youtu.be/rdT3XBZlnHA?si=lFVyThV1WhqmacF1
-ERROR: [youtube] rdT3XBZlnHA: Sign in to confirm you're not a bot. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies. Also see  https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies  for tips on effectively exporting YouTube cookies
-```
+### P2 — Nice to have
 
-**References:**
-- https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp
-- https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies
+## Blocked
 
----
+## Completed (recent)
+- [x] Fix bug — /task cherryagent showed Unknown as project name ✅ 2026-03-15
+- [x] Build CherryTasks Phase 3 — Telegram commands ✅ 2026-03-15
+- [x] Build CherryTasks Phase 2 — git sync ✅ 2026-03-15
+- [x] Build CherryTasks Phase 1 — parser and CRUD API ✅ 2026-03-15
 
-## Create Agent Workflow to Update tasks.md
-
-**Status:** Open
-
-Build a new agent workflow that can update the `tasks.md` file of a given project via its GitHub repo. This agent should be able to add, update, and manage tasks programmatically.
+## Notes
+- Check CLAUDE.md for architectural decisions before starting work
+- VPS IP: 187.124.67.117, SSH user: sam
+- Telegram bot with food logger, YouTube, cost tracking, inspiration, and task management
