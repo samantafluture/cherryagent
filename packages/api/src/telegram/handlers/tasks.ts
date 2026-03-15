@@ -65,7 +65,8 @@ export function createTaskHandlers() {
       return ctx.reply(
         "<b>CherryTasks</b>\n\n" +
           "<b>View:</b>\n" +
-          "  /tasks all — cross-project overview\n" +
+          "  /tasks all — every task across all projects\n" +
+          "  /tasks overview — cross-project summary\n" +
           "  /tasks &lt;project&gt; — tasks for a project\n\n" +
           "<b>Manage:</b>\n" +
           '  /task &lt;project&gt; add "&lt;title&gt;"\n' +
@@ -82,8 +83,12 @@ export function createTaskHandlers() {
       );
     }
 
-    if (args === "all") {
+    if (args === "overview") {
       return handleOverview(ctx);
+    }
+
+    if (args === "all") {
+      return handleAllTasks(ctx);
     }
 
     const project = resolveProject(args);
@@ -126,6 +131,51 @@ export function createTaskHandlers() {
     }
 
     lines.push(`<b>📊 Total: ${totalActive} active across ${overview.length} projects</b>`);
+
+    return ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
+  }
+
+  async function handleAllTasks(ctx: Context) {
+    const icons: Record<string, string> = {
+      cherryagent: "🍒",
+      cherrytree: "🌳",
+      fincherry: "💰",
+      saminprogress: "✍️",
+      surpride: "🎉",
+      recordoc: "📝",
+    };
+
+    const lines = ["<b>📋 All Tasks</b>"];
+
+    for (const project of projects) {
+      const file = loadTaskFile(project.taskFilePath);
+      const icon = icons[project.slug] ?? "📁";
+
+      const sections = [
+        { label: "🟢 P0", tasks: file.sections.activeP0.tasks },
+        { label: "🟡 P1", tasks: file.sections.activeP1.tasks },
+        { label: "⚪ P2", tasks: file.sections.activeP2.tasks },
+        { label: "🔒 Blocked", tasks: file.sections.blocked.tasks },
+      ];
+
+      const hasAnyTasks = sections.some((s) => s.tasks.length > 0);
+      if (!hasAnyTasks) continue;
+
+      lines.push("", `${icon} <b>${escapeHtml(file.projectName)}</b>`, "");
+
+      let taskIndex = 0;
+      for (const section of sections) {
+        if (section.tasks.length === 0) continue;
+        for (const task of section.tasks) {
+          taskIndex++;
+          lines.push(formatTaskLine(taskIndex, task));
+        }
+      }
+    }
+
+    if (lines.length === 1) {
+      lines.push("", "No active tasks across any project.");
+    }
 
     return ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
   }
