@@ -14,6 +14,12 @@ const FALLBACK_PLAYER_CLIENTS = [
   "ios,web_creator",               // fallback 2: iOS + web_creator
 ];
 
+const AUTH_ERROR_PATTERNS = [
+  "Sign in to confirm you're not a bot",
+  "Sign in to confirm your age",
+  "This request was detected as a bot",
+];
+
 /** Copy cookies to a writable temp path so yt-dlp can save updates */
 async function getWritableCookiesArgs(config: MediaConfig): Promise<string[]> {
   if (!config.cookiesFile) return [];
@@ -27,11 +33,12 @@ async function baseArgs(config: MediaConfig): Promise<string[]> {
   return ["--js-runtimes", "node", ...(await getWritableCookiesArgs(config))];
 }
 
+/** Check both error.message and error.stderr (execFile puts output in stderr) */
 function isYouTubeAuthError(error: unknown): boolean {
   const msg = error instanceof Error ? error.message : String(error);
-  return msg.includes("Sign in to confirm you're not a bot")
-    || msg.includes("Sign in to confirm your age")
-    || msg.includes("This request was detected as a bot");
+  const stderr = (error as { stderr?: string }).stderr ?? "";
+  const combined = `${msg}\n${stderr}`;
+  return AUTH_ERROR_PATTERNS.some((p) => combined.includes(p));
 }
 
 function slugify(title: string): string {
@@ -81,16 +88,12 @@ export async function downloadVideo(opts: DownloadOptions): Promise<DownloadResu
     ];
 
     try {
-      await execFileAsync("yt-dlp", args, { timeout: 300_000 });
+      await execFileAsync("yt-dlp", args, { timeout: config.downloadTimeoutMs });
       const stats = await stat(outputPath);
       return { filePath: outputPath, fileSizeBytes: stats.size, format: ext as "mp3" | "mp4" };
     } catch (err) {
       lastError = err;
-      if (!isYouTubeAuthError(err) || !playerClient) {
-        // Not an auth error on a fallback attempt — keep trying fallbacks
-        // (on first attempt playerClient is undefined, so we always try next)
-        if (!isYouTubeAuthError(err)) throw err;
-      }
+      if (!isYouTubeAuthError(err)) throw err;
       // Auth error — try next player client
     }
   }

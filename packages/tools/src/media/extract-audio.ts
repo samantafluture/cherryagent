@@ -9,6 +9,7 @@ export async function extractAudio(
   videoPath: string,
   audioPath: string,
   bitrate = "128k",
+  timeoutMs = 300_000,
 ): Promise<AudioExtractionResult> {
   const args = [
     "-i", videoPath,
@@ -19,7 +20,7 @@ export async function extractAudio(
     audioPath,
   ];
 
-  await execFileAsync("ffmpeg", args, { timeout: 120_000 });
+  await execFileAsync("ffmpeg", args, { timeout: timeoutMs });
 
   // Get duration from ffprobe
   const { stdout } = await execFileAsync("ffprobe", [
