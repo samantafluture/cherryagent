@@ -2,6 +2,7 @@ import { createServer } from "./server.js";
 import { createBot } from "./telegram/bot.js";
 import { GeminiProvider, GroqWhisperClient } from "@cherryagent/core";
 import { FitbitAuth, getMediaConfig, startMediaCleanup, startWeeklyReport, listProjects, startSyncScheduler } from "@cherryagent/tools";
+import { execFileSync } from "node:child_process";
 
 const PORT = parseInt(process.env["PORT"] ?? "3000", 10);
 const HOST = process.env["HOST"] ?? "0.0.0.0";
@@ -65,11 +66,24 @@ async function main() {
   });
 
   // Build GitHub webhook repo map (full_name → local path)
+  // Read actual GitHub repo name from each repo's git remote
   const webhookSecret = process.env["GITHUB_WEBHOOK_SECRET"];
   const repoMap = new Map<string, string>();
-  const githubUser = process.env["GITHUB_USER"] ?? "samantafluture";
   for (const p of projects) {
-    repoMap.set(`${githubUser}/${p.slug}`, p.repoPath);
+    try {
+      const remoteUrl = execFileSync("git", ["remote", "get-url", "origin"], {
+        cwd: p.repoPath,
+        encoding: "utf-8",
+      }).trim();
+      // Extract "user/repo" from URLs like https://...github.com/user/repo.git
+      const match = remoteUrl.match(/github\.com[/:]([^/]+\/[^/.]+)/);
+      if (match) {
+        const fullName = match[1];
+        repoMap.set(fullName, p.repoPath);
+      }
+    } catch {
+      // Skip repos without a remote
+    }
   }
 
   // Start Fastify (health + Fitbit OAuth + GitHub webhook)

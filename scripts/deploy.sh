@@ -12,7 +12,7 @@ echo "==> Building Docker image..."
 docker compose -f docker-compose.prod.yml build
 
 echo "==> Starting API container..."
-docker compose -f docker-compose.prod.yml up -d api
+docker compose -f docker-compose.prod.yml up -d --force-recreate api
 
 echo "==> Reloading Nginx..."
 docker exec infra-nginx nginx -s reload
