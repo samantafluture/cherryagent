@@ -6,6 +6,7 @@ import { createReportHandlers } from "./handlers/report.js";
 import { createCostHandlers } from "./handlers/cost.js";
 import { createInspirationHandlers } from "./handlers/inspiration.js";
 import { createTaskHandlers } from "./handlers/tasks.js";
+import { createBlogHandlers } from "./handlers/blog.js";
 import type { GeminiProvider, GroqWhisperClient } from "@cherryagent/core";
 import type { FitbitAuth, MediaConfig } from "@cherryagent/tools";
 
@@ -53,6 +54,7 @@ export function createBot(deps: BotDeps) {
   const costHandlers = createCostHandlers(costConfig);
 
   const taskHandlers = createTaskHandlers();
+  const blogHandlers = createBlogHandlers();
 
   const surprideWebhookUrl = process.env.SURPRIDE_WEBHOOK_URL;
   const surprideToken = process.env.SURPRIDE_WEBHOOK_TOKEN;
@@ -82,6 +84,7 @@ export function createBot(deps: BotDeps) {
   bot.command("cost", costHandlers.handleCostCommand);
   bot.command("tasks", taskHandlers.handleTasksCommand);
   bot.command("task", taskHandlers.handleTaskCommand);
+  bot.command("blog", blogHandlers.handleBlogCommand);
   if (inspoHandlers) {
     bot.command("inspo", inspoHandlers.handleInspoCommand);
   }
@@ -96,6 +99,7 @@ export function createBot(deps: BotDeps) {
     { command: "inspo", description: "Upload photo to Inspiration Board" },
     { command: "tasks", description: "View tasks — /tasks all or /tasks <project>" },
     { command: "task", description: "Manage tasks — add, done, wip, block, etc." },
+    { command: "blog", description: "Blog — ideas, drafts, status" },
   ]);
 
   // Photo handler — route by caption
