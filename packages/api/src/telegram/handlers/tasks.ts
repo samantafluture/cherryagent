@@ -97,13 +97,13 @@ export function createTaskHandlers() {
       cherryagent: "🍒",
       cherrytree: "🌳",
       fincherry: "💰",
-      saminprogress: "✍️",
-      surpride: "🎉",
-      recordoc: "📝",
+      saminprogress: "💬",
+      surpride: "🏳️‍🌈",
+      recordoc: "▶️",
       "voila-prep": "🇫🇷",
     };
 
-    const lines = ["<b>📋 All Projects</b>", ""];
+    const lines = ["<b>🎯 All Projects</b>", ""];
     let totalActive = 0;
 
     for (const p of overview) {
@@ -131,13 +131,13 @@ export function createTaskHandlers() {
       cherryagent: "🍒",
       cherrytree: "🌳",
       fincherry: "💰",
-      saminprogress: "✍️",
-      surpride: "🎉",
-      recordoc: "📝",
+      saminprogress: "💬",
+      surpride: "🏳️‍🌈",
+      recordoc: "▶️",
       "voila-prep": "🇫🇷",
     };
 
-    const lines = ["<b>📋 All Tasks</b>"];
+    const lines = ["<b>🎯 All Tasks</b>"];
 
     for (const project of projects) {
       const file = loadTaskFile(project.taskFilePath);
