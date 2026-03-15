@@ -40,6 +40,36 @@ export { formatCostReport, checkSpendWarning } from "./cost/cost-report.js";
 export { uploadToInspirationBoard } from "./inspiration/upload.js";
 export type { InspirationUploadResult } from "./inspiration/upload.js";
 
+// Tasks
+export type {
+  Task,
+  Subtask,
+  TaskFile,
+  SectionContent,
+  Priority,
+  Size,
+  TaskStatus,
+  ProjectEntry,
+  ProjectOverview,
+} from "./tasks/index.js";
+export {
+  parseTaskFile,
+  serializeTaskFile,
+  loadTaskFile,
+  saveTaskFile,
+  addTask,
+  updateTaskStatus,
+  deleteTask,
+  reorderTask,
+  addTaskNote,
+  editTaskTitle,
+  findTask,
+  getAllTasks,
+  getActiveTasks,
+  listProjects,
+  getOverview,
+} from "./tasks/index.js";
+
 // Media
 export type {
   YouTubeMode,
