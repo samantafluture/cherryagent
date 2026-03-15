@@ -120,7 +120,7 @@ export function createTaskHandlers() {
         lines.push(`  ▸ ${p.blocked} blocked`);
       }
       if (p.topTask) {
-        lines.push(`  ▸ Top: ${escapeHtml(p.topTask)}`);
+        lines.push(`  ▸ Top: ${formatHtml(p.topTask)}`);
       }
       lines.push("");
     }
@@ -145,7 +145,7 @@ export function createTaskHandlers() {
 
     if (!hasAnyTasks && doneCount === 0) {
       return ctx.reply(
-        `<b>📋 ${escapeHtml(file.projectName)}</b>\n\n` +
+        `<b>🚀 ${escapeHtml(file.projectName)}</b>\n\n` +
           "No tasks yet.\n" +
           `Use /task ${project.slug} add "Title" to create one.`,
         { parse_mode: "HTML" },
@@ -154,7 +154,7 @@ export function createTaskHandlers() {
 
     if (!hasAnyTasks) {
       return ctx.reply(
-        `<b>📋 ${escapeHtml(file.projectName)}</b>\n\n` +
+        `<b>🚀 ${escapeHtml(file.projectName)}</b>\n\n` +
           "No active tasks.\n\n" +
           `<i>✅ ${doneCount} completed</i>\n\n` +
           `Use /task ${project.slug} add "Title" to create one.`,
@@ -162,12 +162,13 @@ export function createTaskHandlers() {
       );
     }
 
-    const lines = [`<b>📋 ${escapeHtml(file.projectName)}</b>`, ""];
+    const lines = [`<b>🚀 ${escapeHtml(file.projectName)}</b>`, ""];
 
     let taskIndex = 0;
     for (const section of sections) {
       if (section.tasks.length === 0) continue;
       lines.push(`<b>${section.label}</b>`);
+      lines.push("");
       for (const task of section.tasks) {
         taskIndex++;
         lines.push(formatTaskLine(taskIndex, task));
@@ -385,8 +386,8 @@ function formatTaskLine(index: number, task: Task): string {
   const icon = statusIcon(task);
   const size = sizeDisplay(task.size);
   const manual = task.manual ? " 👤" : "";
-  const blocked = task.blockedReason ? `\n   🔒 ${escapeHtml(task.blockedReason)}` : "";
-  return `<b>${index}</b> - ${icon} ${escapeHtml(task.title)}${size}${manual}${blocked}`;
+  const blocked = task.blockedReason ? `\n   🔒 ${formatHtml(task.blockedReason)}` : "";
+  return `<b>${index}</b> - ${icon} ${formatHtml(task.title)}${size}${manual}${blocked}`;
 }
 
 function buildTaskKeyboard(slug: string, tasks: Task[]) {
@@ -415,6 +416,12 @@ function escapeHtml(text: string): string {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
+}
+
+/** Escape HTML and convert backtick-wrapped text to <code> tags */
+function formatHtml(text: string): string {
+  const escaped = escapeHtml(text);
+  return escaped.replace(/`([^`]+)`/g, "<code>$1</code>");
 }
 
 async function syncRepo(repoPath: string): Promise<void> {
