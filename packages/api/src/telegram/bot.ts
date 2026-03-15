@@ -5,6 +5,7 @@ import { createYouTubeHandlers } from "./handlers/youtube.js";
 import { createReportHandlers } from "./handlers/report.js";
 import { createCostHandlers } from "./handlers/cost.js";
 import { createInspirationHandlers } from "./handlers/inspiration.js";
+import { createTaskHandlers } from "./handlers/tasks.js";
 import type { GeminiProvider, GroqWhisperClient } from "@cherryagent/core";
 import type { FitbitAuth, MediaConfig } from "@cherryagent/tools";
 
@@ -51,6 +52,8 @@ export function createBot(deps: BotDeps) {
 
   const costHandlers = createCostHandlers(costConfig);
 
+  const taskHandlers = createTaskHandlers();
+
   const surprideWebhookUrl = process.env.SURPRIDE_WEBHOOK_URL;
   const surprideToken = process.env.SURPRIDE_WEBHOOK_TOKEN;
   const inspoHandlers =
@@ -77,6 +80,8 @@ export function createBot(deps: BotDeps) {
   bot.command("yt", ytHandlers.handleYtCommand);
   bot.command("report", reportHandlers.handleReportCommand);
   bot.command("cost", costHandlers.handleCostCommand);
+  bot.command("tasks", taskHandlers.handleTasksCommand);
+  bot.command("task", taskHandlers.handleTaskCommand);
   if (inspoHandlers) {
     bot.command("inspo", inspoHandlers.handleInspoCommand);
   }
@@ -89,6 +94,8 @@ export function createBot(deps: BotDeps) {
     { command: "yt", description: "YouTube — download, transcribe, notes" },
     { command: "cost", description: "AI spend report — today, week, month" },
     { command: "inspo", description: "Upload photo to Inspiration Board" },
+    { command: "tasks", description: "View tasks — /tasks all or /tasks <project>" },
+    { command: "task", description: "Manage tasks — add, done, wip, block, etc." },
   ]);
 
   // Photo handler — route by caption
@@ -104,7 +111,13 @@ export function createBot(deps: BotDeps) {
   bot.on("message:text", foodHandlers.handleText);
 
   // Callback queries (confirmation buttons)
-  bot.on("callback_query:data", foodHandlers.handleCallback);
+  bot.on("callback_query:data", async (ctx) => {
+    const data = ctx.callbackQuery?.data ?? "";
+    if (data.startsWith("task_")) {
+      return taskHandlers.handleTaskCallback(ctx);
+    }
+    return foodHandlers.handleCallback(ctx);
+  });
 
   // Error handler — log errors instead of crashing silently
   bot.catch((err) => {
