@@ -110,6 +110,7 @@ export function createTaskHandlers() {
       saminprogress: "✍️",
       surpride: "🎉",
       recordoc: "📝",
+      "voila-prep": "🇫🇷",
     };
 
     const lines = ["<b>📋 All Projects</b>", ""];
@@ -143,6 +144,7 @@ export function createTaskHandlers() {
       saminprogress: "✍️",
       surpride: "🎉",
       recordoc: "📝",
+      "voila-prep": "🇫🇷",
     };
 
     const lines = ["<b>📋 All Tasks</b>"];
