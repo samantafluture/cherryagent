@@ -7,6 +7,13 @@ import type { MediaConfig } from "./config.js";
 
 const execFileAsync = promisify(execFile);
 
+/** Player client strategies to try when YouTube blocks requests */
+const FALLBACK_PLAYER_CLIENTS = [
+  undefined,                       // default (no override)
+  "web_creator,mediaconnect",      // fallback 1: web_creator + mediaconnect
+  "ios,web_creator",               // fallback 2: iOS + web_creator
+];
+
 /** Copy cookies to a writable temp path so yt-dlp can save updates */
 async function getWritableCookiesArgs(config: MediaConfig): Promise<string[]> {
   if (!config.cookiesFile) return [];
@@ -18,6 +25,13 @@ async function getWritableCookiesArgs(config: MediaConfig): Promise<string[]> {
 /** Common args for yt-dlp: JS runtime for n challenge + cookies */
 async function baseArgs(config: MediaConfig): Promise<string[]> {
   return ["--js-runtimes", "node", ...(await getWritableCookiesArgs(config))];
+}
+
+function isYouTubeAuthError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  return msg.includes("Sign in to confirm you're not a bot")
+    || msg.includes("Sign in to confirm your age")
+    || msg.includes("This request was detected as a bot");
 }
 
 function slugify(title: string): string {
@@ -44,41 +58,43 @@ export async function downloadVideo(opts: DownloadOptions): Promise<DownloadResu
 
   const common = await baseArgs(config);
 
-  if (mode === "audio") {
-    const outputPath = join(config.mediaDir, `${slug}_${timestamp}.mp3`);
+  const ext = mode === "audio" ? "mp3" : "mp4";
+  const outputPath = join(config.mediaDir, `${slug}_${timestamp}.${ext}`);
+
+  const modeArgs = mode === "audio"
+    ? ["-f", "ba/b", "-x", "--audio-format", "mp3", "--audio-quality", "128K"]
+    : ["-S", `res:${config.videoMaxHeight}`, "--merge-output-format", "mp4"];
+
+  let lastError: unknown;
+
+  for (const playerClient of FALLBACK_PLAYER_CLIENTS) {
     const args = [
       ...common,
-      "-f", "ba/b",  // best audio, fallback to best combined
-      "-x",
-      "--audio-format", "mp3",
-      "--audio-quality", "128K",
+      ...(playerClient
+        ? ["--extractor-args", `youtube:player_client=${playerClient}`]
+        : []),
+      ...modeArgs,
       "--no-playlist",
       "--no-warnings",
       "-o", outputPath,
       url,
     ];
 
-    await execFileAsync("yt-dlp", args, { timeout: 300_000 });
-
-    const stats = await stat(outputPath);
-    return { filePath: outputPath, fileSizeBytes: stats.size, format: "mp3" };
+    try {
+      await execFileAsync("yt-dlp", args, { timeout: 300_000 });
+      const stats = await stat(outputPath);
+      return { filePath: outputPath, fileSizeBytes: stats.size, format: ext as "mp3" | "mp4" };
+    } catch (err) {
+      lastError = err;
+      if (!isYouTubeAuthError(err) || !playerClient) {
+        // Not an auth error on a fallback attempt — keep trying fallbacks
+        // (on first attempt playerClient is undefined, so we always try next)
+        if (!isYouTubeAuthError(err)) throw err;
+      }
+      // Auth error — try next player client
+    }
   }
 
-  // Video mode — use format sorting for flexible format selection
-  const h = config.videoMaxHeight;
-  const outputPath = join(config.mediaDir, `${slug}_${timestamp}.mp4`);
-  const args = [
-    ...common,
-    "-S", `res:${h}`,
-    "--merge-output-format", "mp4",
-    "--no-playlist",
-    "--no-warnings",
-    "-o", outputPath,
-    url,
-  ];
-
-  await execFileAsync("yt-dlp", args, { timeout: 300_000 });
-
-  const stats = await stat(outputPath);
-  return { filePath: outputPath, fileSizeBytes: stats.size, format: "mp4" };
+  // All fallback player clients exhausted
+  throw lastError;
 }
