@@ -87,7 +87,7 @@ export async function runYouTubePipeline(
     // Extract audio from video
     onProgress?.("extracting_audio");
     audioPath = videoPath.replace(/\.mp4$/, ".mp3");
-    const audioResult = await extractAudio(videoPath, audioPath, config.audioBitrate);
+    const audioResult = await extractAudio(videoPath, audioPath, config.audioBitrate, config.extractionTimeoutMs);
     audioSizeBytes = audioResult.fileSizeBytes;
     metadata.durationSeconds = audioResult.durationSeconds;
   } else {

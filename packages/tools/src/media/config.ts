@@ -8,6 +8,8 @@ export interface MediaConfig {
   videoMaxHeight: number;
   audioBitrate: string;
   cookiesFile?: string;
+  downloadTimeoutMs: number;
+  extractionTimeoutMs: number;
 }
 
 export function getMediaConfig(): MediaConfig {
@@ -20,5 +22,7 @@ export function getMediaConfig(): MediaConfig {
     videoMaxHeight: parseInt(process.env["VIDEO_MAX_HEIGHT"] ?? "480", 10),
     audioBitrate: process.env["AUDIO_BITRATE"] ?? "128k",
     cookiesFile: process.env["YTDLP_COOKIES_FILE"],
+    downloadTimeoutMs: parseInt(process.env["YTDLP_TIMEOUT_MS"] ?? "600000", 10),
+    extractionTimeoutMs: parseInt(process.env["FFMPEG_TIMEOUT_MS"] ?? "300000", 10),
   };
 }
