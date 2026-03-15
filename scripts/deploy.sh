@@ -3,6 +3,10 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+echo "==> Configuring git identity..."
+git config user.email "sam@cherryagent.dev"
+git config user.name "sam"
+
 echo "==> Pulling latest code..."
 git clean -fd --exclude=.claude/tasks.md
 git checkout -- . ':!.claude/tasks.md'
