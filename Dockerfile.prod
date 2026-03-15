@@ -37,8 +37,8 @@ FROM node:20-alpine AS production
 
 RUN corepack enable && corepack prepare pnpm@10.27.0 --activate
 
-# Install ffmpeg, python3, yt-dlp, and yt-dlp-ejs (JS runtime for YouTube n challenge)
-RUN apk add --no-cache ffmpeg python3 py3-pip \
+# Install ffmpeg, python3, yt-dlp, yt-dlp-ejs, and git (for CherryTasks sync)
+RUN apk add --no-cache ffmpeg python3 py3-pip git \
   && pip3 install --no-cache-dir --break-system-packages yt-dlp yt-dlp-ejs
 
 WORKDIR /app
@@ -62,6 +62,9 @@ COPY --from=build /app/packages/api/dist/ packages/api/dist/
 # Create data directory for Fitbit token storage and media
 RUN mkdir -p /home/node/.cherryagent /opt/cherry-agent/media \
   && chown -R node:node /home/node/.cherryagent /opt/cherry-agent/media
+
+# Trust all host-mounted repos for CherryTasks git sync
+RUN git config --system safe.directory '*'
 
 USER node
 
