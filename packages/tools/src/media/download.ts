@@ -55,10 +55,14 @@ export interface DownloadOptions {
   title: string;
   mode: "video" | "audio";
   config: MediaConfig;
+  onRetry?: (attempt: number, total: number, reason: string) => void;
 }
 
+/** Per-attempt timeout: cap at 3 minutes to avoid long hangs per fallback */
+const PER_ATTEMPT_TIMEOUT_MS = 180_000;
+
 export async function downloadVideo(opts: DownloadOptions): Promise<DownloadResult> {
-  const { url, title, mode, config } = opts;
+  const { url, title, mode, config, onRetry } = opts;
   await mkdir(config.mediaDir, { recursive: true });
 
   const slug = slugify(title);
@@ -73,9 +77,12 @@ export async function downloadVideo(opts: DownloadOptions): Promise<DownloadResu
     ? ["-f", "ba/b", "-x", "--audio-format", "mp3", "--audio-quality", "128K"]
     : ["-S", `res:${config.videoMaxHeight}`, "--merge-output-format", "mp4"];
 
+  const attemptTimeout = Math.min(config.downloadTimeoutMs, PER_ATTEMPT_TIMEOUT_MS);
+  const totalClients = FALLBACK_PLAYER_CLIENTS.length;
   let lastError: unknown;
 
-  for (const playerClient of FALLBACK_PLAYER_CLIENTS) {
+  for (let i = 0; i < totalClients; i++) {
+    const playerClient = FALLBACK_PLAYER_CLIENTS[i];
     const args = [
       ...common,
       ...(playerClient
@@ -89,13 +96,20 @@ export async function downloadVideo(opts: DownloadOptions): Promise<DownloadResu
     ];
 
     try {
-      await execFileAsync("yt-dlp", args, { timeout: config.downloadTimeoutMs });
+      await execFileAsync("yt-dlp", args, { timeout: attemptTimeout });
       const stats = await stat(outputPath);
       return { filePath: outputPath, fileSizeBytes: stats.size, format: ext as "mp3" | "mp4" };
     } catch (err) {
       lastError = err;
-      if (!isYouTubeAuthError(err)) throw err;
-      // Auth error — try next player client
+      const isTimeout = (err as { killed?: boolean }).killed === true;
+      const isAuth = isYouTubeAuthError(err);
+
+      if (!isTimeout && !isAuth) throw err;
+
+      const reason = isTimeout ? "timed out" : "blocked by YouTube";
+      if (i < totalClients - 1) {
+        onRetry?.(i + 1, totalClients, reason);
+      }
     }
   }
 
