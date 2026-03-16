@@ -59,6 +59,7 @@ export class GroqWhisperClient {
         Authorization: `Bearer ${this.apiKey}`,
       },
       body: formData,
+      signal: AbortSignal.timeout(300_000), // 5-minute timeout per transcription request
     });
 
     if (!response.ok) {

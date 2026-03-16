@@ -52,8 +52,8 @@ export interface PipelineDeps {
   richNotesSystemPrompt: string;
 }
 
-/** Overall pipeline timeout: 10 minutes max for the entire operation */
-const PIPELINE_TIMEOUT_MS = 600_000;
+/** Overall pipeline timeout: 15 minutes max for the entire operation */
+const PIPELINE_TIMEOUT_MS = 900_000;
 
 export async function runYouTubePipeline(
   url: string,
