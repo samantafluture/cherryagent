@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { stat, mkdir, copyFile } from "node:fs/promises";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { promisify } from "node:util";
 import type { DownloadResult } from "./types.js";
 import type { MediaConfig } from "./config.js";
@@ -23,7 +24,7 @@ const AUTH_ERROR_PATTERNS = [
 /** Copy cookies to a writable temp path so yt-dlp can save updates */
 async function getWritableCookiesArgs(config: MediaConfig): Promise<string[]> {
   if (!config.cookiesFile) return [];
-  const tempCookies = join(config.mediaDir, ".cookies.tmp.txt");
+  const tempCookies = join(tmpdir(), ".cookies.tmp.txt");
   await copyFile(config.cookiesFile, tempCookies);
   return ["--cookies", tempCookies];
 }
