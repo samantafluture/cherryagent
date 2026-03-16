@@ -52,6 +52,9 @@ export interface PipelineDeps {
   richNotesSystemPrompt: string;
 }
 
+/** Overall pipeline timeout: 10 minutes max for the entire operation */
+const PIPELINE_TIMEOUT_MS = 600_000;
+
 export async function runYouTubePipeline(
   url: string,
   mode: YouTubeMode,
@@ -59,7 +62,25 @@ export async function runYouTubePipeline(
   config: MediaConfig,
   onProgress?: (step: ProgressStep, detail?: string) => void,
 ): Promise<PipelineResult> {
+  return withTimeout(
+    () => runPipelineInner(url, mode, deps, config, onProgress),
+    PIPELINE_TIMEOUT_MS,
+    "YouTube pipeline timed out — the video may be too long or YouTube is blocking downloads. Try again later.",
+  );
+}
+
+async function runPipelineInner(
+  url: string,
+  mode: YouTubeMode,
+  deps: PipelineDeps,
+  config: MediaConfig,
+  onProgress?: (step: ProgressStep, detail?: string) => void,
+): Promise<PipelineResult> {
   let totalCost = 0;
+
+  const onRetry = (attempt: number, total: number, reason: string) => {
+    onProgress?.("downloading_audio", `Retry ${attempt}/${total - 1} (${reason})…`);
+  };
 
   // Step 1: Validate
   onProgress?.("validating");
@@ -80,6 +101,7 @@ export async function runYouTubePipeline(
       title: metadata.title,
       mode: "video",
       config,
+      onRetry,
     });
     videoPath = videoResult.filePath;
     videoSizeBytes = videoResult.fileSizeBytes;
@@ -98,6 +120,7 @@ export async function runYouTubePipeline(
       title: metadata.title,
       mode: "audio",
       config,
+      onRetry,
     });
     audioPath = audioResult.filePath;
     audioSizeBytes = audioResult.fileSizeBytes;
@@ -180,4 +203,18 @@ function estimateLLMCost(
 ): number {
   return (usage.inputTokens / 1_000_000) * llm.inputCostPer1M +
     (usage.outputTokens / 1_000_000) * llm.outputCostPer1M;
+}
+
+async function withTimeout<T>(
+  fn: () => Promise<T>,
+  timeoutMs: number,
+  message: string,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+    fn().then(
+      (result) => { clearTimeout(timer); resolve(result); },
+      (err) => { clearTimeout(timer); reject(err); },
+    );
+  });
 }
