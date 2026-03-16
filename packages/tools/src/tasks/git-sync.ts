@@ -1,4 +1,6 @@
 import { execFile } from "node:child_process";
+import { access } from "node:fs/promises";
+import { join } from "node:path";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
@@ -61,6 +63,15 @@ export async function pullChanges(repoPath: string): Promise<GitSyncResult> {
     }
   }
 
+  // Clean up stale MERGE_HEAD from a previously interrupted merge
+  const mergeHeadExists = await access(join(repoPath, ".git", "MERGE_HEAD")).then(
+    () => true,
+    () => false
+  );
+  if (mergeHeadExists) {
+    await git(repoPath, ["merge", "--abort"]).catch(() => {});
+  }
+
   try {
     await git(repoPath, ["pull", "--rebase=false"]);
     return { action: "pulled", message: "Pulled latest changes" };
@@ -69,7 +80,7 @@ export async function pullChanges(repoPath: string): Promise<GitSyncResult> {
     const errMsg = (error.stderr ?? "") + (error.message ?? "");
 
     // Merge conflict — abort and keep VPS state
-    if (errMsg.includes("CONFLICT")) {
+    if (errMsg.includes("CONFLICT") || errMsg.includes("MERGE_HEAD exists")) {
       await git(repoPath, ["merge", "--abort"]).catch(() => {});
       return {
         action: "conflict",
