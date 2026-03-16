@@ -46,4 +46,8 @@ jobs:
           port: 8443
           username: sam
           key: ${{ secrets.VPS_SSH_KEY }}
-          script: cd ~/apps/cherryagent && bash scripts/deploy.sh
+          script: |
+            cd ~/apps/cherryagent
+            git fetch origin main
+            git reset --hard origin/main
+            bash scripts/deploy.sh
