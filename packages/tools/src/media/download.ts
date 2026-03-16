@@ -24,6 +24,11 @@ const AUTH_ERROR_PATTERNS = [
 /** Copy cookies to a writable temp path so yt-dlp can save updates */
 async function getWritableCookiesArgs(config: MediaConfig): Promise<string[]> {
   if (!config.cookiesFile) return [];
+
+  // Verify source cookies path is a file, not a directory (e.g. stale Docker volume mount)
+  const srcStat = await stat(config.cookiesFile).catch(() => null);
+  if (!srcStat || srcStat.isDirectory()) return [];
+
   const tempCookies = join(tmpdir(), ".cookies.tmp.txt");
   // Remove stale directory at the target path to avoid EISDIR on copyFile
   const destStat = await stat(tempCookies).catch(() => null);
