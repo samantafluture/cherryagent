@@ -12,7 +12,7 @@ services:
     volumes:
       - cherryagent-data:/home/node/.cherryagent
       - cherryagent-media:/opt/cherry-agent/media
-      - ./cookies.txt:/app/cookies.txt
+      - ./cookies.txt:/app/cookies.txt:ro
       - /home/sam/apps:/home/sam/apps
 
 networks:
