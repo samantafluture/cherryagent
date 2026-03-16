@@ -1,4 +1,5 @@
 import type { Context } from "grammy";
+import { escapeHtml } from "../utils.js";
 import {
   listProjects,
   getOverview,
@@ -486,13 +487,6 @@ function parseIndices(input?: string): number[] {
     .split(",")
     .map((s) => Number(s.trim()))
     .filter((n) => n > 0 && Number.isInteger(n));
-}
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
 }
 
 /** Escape HTML and convert backtick-wrapped text to <code> tags */

@@ -77,6 +77,34 @@ export {
   startSyncScheduler,
 } from "./tasks/index.js";
 
+// Voice Pipeline
+export type {
+  VoiceIntent,
+  VoiceSession,
+  AgentRunResult,
+  ClaudeRunResult,
+  PrResult,
+  ProjectMapping,
+} from "./voice/index.js";
+export { parseIntent, getDefaultProjectMappings } from "./voice/index.js";
+export { runGeminiAgent } from "./voice/index.js";
+export type { AgentLLMProvider } from "./voice/index.js";
+export {
+  createBranchAndPush,
+  pushExistingBranch,
+  createDraftPr,
+  mergePr,
+  closePr,
+  remoteBranchExists,
+} from "./voice/index.js";
+export {
+  getActiveSession,
+  createSession,
+  updateSession,
+  deleteSession,
+  getAllSessions,
+} from "./voice/index.js";
+
 // Media
 export type {
   YouTubeMode,

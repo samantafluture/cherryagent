@@ -23,6 +23,14 @@ export interface ChatWithVideoParams {
   maxTokens?: number;
 }
 
+export interface TranscribeAudioParams {
+  audioBuffer: Buffer;
+  mimeType?: string;
+  systemInstruction?: string;
+  temperature?: number;
+  maxTokens?: number;
+}
+
 interface GeminiContent {
   role: "user" | "model";
   parts: GeminiPart[];
@@ -201,6 +209,39 @@ export class GeminiProvider implements LLMProvider {
     } catch {
       // non-critical — file will expire on its own
     }
+
+    return this.normalizeResponse(response);
+  }
+
+  async transcribeAudio(params: TranscribeAudioParams): Promise<LLMResponse> {
+    const mimeType = params.mimeType ?? "audio/ogg";
+    const audioBase64 = params.audioBuffer.toString("base64");
+
+    const contents: GeminiContent[] = [
+      {
+        role: "user",
+        parts: [
+          { inlineData: { data: audioBase64, mimeType } },
+          {
+            text:
+              params.systemInstruction ??
+              "Transcribe this voice message into clean, actionable text. Remove filler words, hesitations, and false starts. Output only the transcription, nothing else.",
+          },
+        ],
+      },
+    ];
+
+    const config: Record<string, unknown> = {
+      temperature: params.temperature ?? 0.1,
+      maxOutputTokens: params.maxTokens ?? 2048,
+      thinkingConfig: { thinkingBudget: 0 },
+    };
+
+    const response = await this.client.models.generateContent({
+      model: this.model,
+      contents,
+      config,
+    });
 
     return this.normalizeResponse(response);
   }
