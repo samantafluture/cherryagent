@@ -24,6 +24,9 @@ const AUTH_ERROR_PATTERNS = [
 /** Copy cookies to a unique writable temp path so yt-dlp can save updates */
 async function getWritableCookiesArgs(config: MediaConfig): Promise<string[]> {
   if (!config.cookiesFile) return [];
+  // Skip if the path is a directory (Docker creates one when host file is missing)
+  const srcStat = await stat(config.cookiesFile).catch(() => null);
+  if (!srcStat?.isFile() || srcStat.size === 0) return [];
   const tempDir = await mkdtemp(join(tmpdir(), "ytdlp-cookies-"));
   const tempCookies = join(tempDir, "cookies.txt");
   await copyFile(config.cookiesFile, tempCookies);
