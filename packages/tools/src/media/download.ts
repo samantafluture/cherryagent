@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { stat, mkdir, copyFile, rm } from "node:fs/promises";
+import { stat, mkdir, copyFile, rm, mkdtemp } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { promisify } from "node:util";
@@ -21,15 +21,11 @@ const AUTH_ERROR_PATTERNS = [
   "This request was detected as a bot",
 ];
 
-/** Copy cookies to a writable temp path so yt-dlp can save updates */
+/** Copy cookies to a unique writable temp path so yt-dlp can save updates */
 async function getWritableCookiesArgs(config: MediaConfig): Promise<string[]> {
   if (!config.cookiesFile) return [];
-  const tempCookies = join(tmpdir(), ".cookies.tmp.txt");
-  // Remove stale directory at the target path to avoid EISDIR on copyFile
-  const destStat = await stat(tempCookies).catch(() => null);
-  if (destStat?.isDirectory()) {
-    await rm(tempCookies, { recursive: true });
-  }
+  const tempDir = await mkdtemp(join(tmpdir(), "ytdlp-cookies-"));
+  const tempCookies = join(tempDir, "cookies.txt");
   await copyFile(config.cookiesFile, tempCookies);
   return ["--cookies", tempCookies];
 }
