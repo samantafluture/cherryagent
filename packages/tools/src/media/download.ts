@@ -1,12 +1,9 @@
-import { execFile } from "node:child_process";
+import { spawn } from "node:child_process";
 import { stat, mkdir, copyFile, rm, mkdtemp } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { promisify } from "node:util";
 import type { DownloadResult } from "./types.js";
 import type { MediaConfig } from "./config.js";
-
-const execFileAsync = promisify(execFile);
 
 /** Player client strategies to try when YouTube blocks requests */
 const FALLBACK_PLAYER_CLIENTS = [
@@ -40,10 +37,77 @@ async function getWritableCookiesArgs(config: MediaConfig): Promise<{ args: stri
   };
 }
 
-/** Common args for yt-dlp: JS runtime for n challenge + cookies */
+/** Common args for yt-dlp: JS runtime for n challenge + cookies + network safety */
 async function baseArgs(config: MediaConfig): Promise<{ args: string[]; cleanup: () => Promise<void> }> {
   const cookies = await getWritableCookiesArgs(config);
-  return { args: ["--js-runtimes", "node", ...cookies.args], cleanup: cookies.cleanup };
+  return {
+    args: [
+      "--js-runtimes", "node",
+      "--socket-timeout", "30",   // abort if a socket stalls for 30s
+      "--retries", "3",           // limit internal retries
+      "--abort-on-unavailable-fragments",
+      ...cookies.args,
+    ],
+    cleanup: cookies.cleanup,
+  };
+}
+
+/**
+ * Run a command with a timeout that kills the entire process group.
+ * Unlike execFile's timeout (which only SIGTERMs the parent), this
+ * ensures child processes (e.g. ffmpeg spawned by yt-dlp) are killed too.
+ */
+function spawnWithGroupKill(
+  cmd: string,
+  args: string[],
+  timeoutMs: number,
+): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(cmd, args, {
+      detached: true,          // create a new process group
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    let stdout = "";
+    let stderr = "";
+    let killed = false;
+    let done = false;
+
+    child.stdout!.on("data", (chunk: Buffer) => { stdout += chunk.toString(); });
+    child.stderr!.on("data", (chunk: Buffer) => { stderr += chunk.toString(); });
+
+    const timer = setTimeout(() => {
+      killed = true;
+      // Kill entire process group (negative PID) so child processes die too
+      try { process.kill(-child.pid!, "SIGKILL"); } catch { /* already dead */ }
+    }, timeoutMs);
+
+    const finish = (code: number | null) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      if (killed) {
+        const err = Object.assign(new Error(`timed out after ${timeoutMs}ms`), { killed: true, stderr });
+        reject(err);
+      } else if (code !== 0) {
+        const err = Object.assign(
+          new Error(`yt-dlp exited with code ${code}\n${stderr}`),
+          { code, stderr },
+        );
+        reject(err);
+      } else {
+        resolve({ stdout, stderr });
+      }
+    };
+
+    child.on("close", finish);
+    child.on("error", (err) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      reject(err);
+    });
+  });
 }
 
 /** Check both error.message and error.stderr (execFile puts output in stderr) */
@@ -109,7 +173,7 @@ export async function downloadVideo(opts: DownloadOptions): Promise<DownloadResu
       ];
 
       try {
-        await execFileAsync("yt-dlp", args, { timeout: attemptTimeout });
+        await spawnWithGroupKill("yt-dlp", args, attemptTimeout);
         const stats = await stat(outputPath);
         return { filePath: outputPath, fileSizeBytes: stats.size, format: ext as "mp3" | "mp4" };
       } catch (err) {
