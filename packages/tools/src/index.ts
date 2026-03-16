@@ -63,6 +63,7 @@ export {
   updateTaskStatus,
   deleteTask,
   reorderTask,
+  changeTaskPriority,
   addTaskNote,
   editTaskTitle,
   findTask,

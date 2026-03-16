@@ -8,6 +8,7 @@ import {
   updateTaskStatus,
   deleteTask,
   reorderTask,
+  changeTaskPriority,
   addTaskNote,
   editTaskTitle,
   findTask,
@@ -65,6 +66,7 @@ export function createTaskHandlers() {
           "  /task &lt;project&gt; block &lt;#,#,#&gt;\n" +
           "  /task &lt;project&gt; up &lt;#&gt;\n" +
           "  /task &lt;project&gt; down &lt;#&gt;\n" +
+          "  /task &lt;project&gt; pri &lt;#&gt; &lt;P0|P1|P2&gt;\n" +
           "  /task &lt;project&gt; drop &lt;#,#,#&gt;\n" +
           '  /task &lt;project&gt; note &lt;#&gt; "&lt;text&gt;"\n' +
           '  /task &lt;project&gt; edit &lt;#&gt; "&lt;title&gt;"\n\n' +
@@ -316,6 +318,28 @@ export function createTaskHandlers() {
         return ctx.reply(`↕️ Moved #${index} ${escapeHtml(task.title)} ${action}`);
       }
 
+      case "pri": {
+        const index = Number(parts[2]);
+        const priInput = parts[3]?.toUpperCase();
+        if (!index || !priInput || !["P0", "P1", "P2"].includes(priInput)) {
+          return ctx.reply(
+            `Usage: /task ${projectSlug} pri &lt;#&gt; &lt;P0|P1|P2&gt;`,
+            { parse_mode: "HTML" },
+          );
+        }
+        const task = allDisplayed[index - 1];
+        if (!task) return ctx.reply(`No task at #${index}`);
+        if (task.status === "blocked") return ctx.reply("🔒 Unblock the task first before changing priority.");
+        const changed = changeTaskPriority(file, task.id, priInput as Priority);
+        if (!changed) return ctx.reply(`Task is already ${priInput}.`);
+        saveTaskFile(project.taskFilePath, file);
+        await syncRepo(project.repoPath);
+        const priEmoji = { P0: "🟢", P1: "🟡", P2: "⚪" } as const;
+        return ctx.reply(
+          `${priEmoji[priInput as Priority]} #${index} ${escapeHtml(task.title)} → ${priInput}`,
+        );
+      }
+
       case "drop": {
         const indices = parseIndices(parts[2]);
         if (indices.length === 0) {
@@ -368,7 +392,7 @@ export function createTaskHandlers() {
 
       default:
         return ctx.reply(
-          `Unknown action: ${action}\nActions: add, bug, done, wip, block, up, down, drop, note, edit`,
+          `Unknown action: ${action}\nActions: add, bug, done, wip, block, up, down, pri, drop, note, edit`,
         );
     }
   }
