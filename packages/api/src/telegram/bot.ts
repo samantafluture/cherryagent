@@ -7,6 +7,7 @@ import { createCostHandlers } from "./handlers/cost.js";
 import { createInspirationHandlers } from "./handlers/inspiration.js";
 import { createTaskHandlers } from "./handlers/tasks.js";
 import { createBlogHandlers } from "./handlers/blog.js";
+import { createVoiceHandlers } from "./handlers/voice.js";
 import type { GeminiProvider, GroqWhisperClient } from "@cherryagent/core";
 import type { FitbitAuth, MediaConfig } from "@cherryagent/tools";
 
@@ -56,6 +57,12 @@ export function createBot(deps: BotDeps) {
   const taskHandlers = createTaskHandlers();
   const blogHandlers = createBlogHandlers();
 
+  const voiceHandlers = createVoiceHandlers({
+    gemini: deps.gemini,
+    botToken: deps.token,
+    costConfig,
+  });
+
   const surprideWebhookUrl = process.env.SURPRIDE_WEBHOOK_URL;
   const surprideToken = process.env.SURPRIDE_WEBHOOK_TOKEN;
   const inspoHandlers =
@@ -102,6 +109,9 @@ export function createBot(deps: BotDeps) {
     { command: "blog", description: "Blog — ideas, drafts, status" },
   ]);
 
+  // Voice handler — voice coding pipeline
+  bot.on("message:voice", voiceHandlers.handleVoice);
+
   // Photo handler — route by caption
   bot.on("message:photo", (ctx) => {
     const caption = ctx.message.caption ?? "";
@@ -119,6 +129,9 @@ export function createBot(deps: BotDeps) {
     const data = ctx.callbackQuery?.data ?? "";
     if (data.startsWith("task_")) {
       return taskHandlers.handleTaskCallback(ctx);
+    }
+    if (data.startsWith("voice_")) {
+      return voiceHandlers.handleVoiceCallback(ctx);
     }
     return foodHandlers.handleCallback(ctx);
   });

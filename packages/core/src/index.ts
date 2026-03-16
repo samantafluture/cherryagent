@@ -1,6 +1,6 @@
 export { AgentLoop } from "./agent-loop.js";
 export { GeminiProvider } from "./providers/gemini.js";
-export type { ChatWithImageParams, ChatWithVideoParams } from "./providers/gemini.js";
+export type { ChatWithImageParams, ChatWithVideoParams, TranscribeAudioParams } from "./providers/gemini.js";
 export { GroqWhisperClient } from "./providers/groq-whisper.js";
 export type { TranscriptionResult, TranscriptionSegment } from "./providers/groq-whisper.js";
 export {

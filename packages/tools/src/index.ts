@@ -76,6 +76,31 @@ export {
   startSyncScheduler,
 } from "./tasks/index.js";
 
+// Voice Pipeline
+export type {
+  VoiceIntent,
+  VoiceSession,
+  ClaudeRunResult,
+  PrResult,
+  ProjectMapping,
+} from "./voice/index.js";
+export { parseIntent, DEFAULT_PROJECT_MAPPINGS } from "./voice/index.js";
+export { runClaudeCode } from "./voice/index.js";
+export {
+  createBranchAndPush,
+  pushExistingBranch,
+  createDraftPr,
+  mergePr,
+  closePr,
+} from "./voice/index.js";
+export {
+  getActiveSession,
+  createSession,
+  updateSession,
+  deleteSession,
+  getAllSessions,
+} from "./voice/index.js";
+
 // Media
 export type {
   YouTubeMode,
