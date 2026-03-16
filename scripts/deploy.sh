@@ -10,7 +10,7 @@ git config user.name "sam"
 echo "==> Pulling latest code..."
 git clean -fd --exclude=.claude/tasks.md
 git checkout -- . ':!.claude/tasks.md'
-git pull origin main
+git fetch origin main && git reset --hard origin/main
 
 echo "==> Building Docker image..."
 docker compose -f docker-compose.prod.yml build
