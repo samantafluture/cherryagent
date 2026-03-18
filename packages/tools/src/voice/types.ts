@@ -35,6 +35,7 @@ export interface PendingVoiceTask {
   branchName?: string;
   prTitle?: string;
   createdAt: number;
+  updatedAt: number;
 }
 
 export interface AgentRunResult {

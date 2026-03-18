@@ -93,21 +93,7 @@ export function parseIntent(
   }
 
   // Match task type using priority-based detection
-  let taskType: VoiceIntent["taskType"] = "feature";
-  let bestPriority = TASK_TYPE_PRIORITY.feature;
-
-  for (const [type, keywords] of Object.entries(TASK_TYPE_KEYWORDS)) {
-    for (const keyword of keywords) {
-      if (lower.includes(keyword)) {
-        const priority = TASK_TYPE_PRIORITY[type as VoiceIntent["taskType"]];
-        if (priority < bestPriority) {
-          taskType = type as VoiceIntent["taskType"];
-          bestPriority = priority;
-        }
-        break;
-      }
-    }
-  }
+  const taskType = detectTaskType(transcript);
 
   // Generate branch name from transcript
   const branchName = generateBranchName(taskType, transcript);

@@ -102,6 +102,7 @@ export function createVoiceHandlers(deps: VoiceHandlerDeps) {
         transcript,
         state: "awaiting_transcript_approval",
         createdAt: Date.now(),
+        updatedAt: Date.now(),
       });
 
       const keyboard = new InlineKeyboard()
@@ -116,6 +117,7 @@ export function createVoiceHandlers(deps: VoiceHandlerDeps) {
       );
     } catch (err) {
       console.error("[voice] Pipeline error:", err);
+      deletePendingTask(chatId);
       const message = err instanceof Error ? err.message : String(err);
       await ctx.reply(
         `❌ Voice pipeline error:\n<pre>${escapeHtml(message).slice(0, 300)}</pre>`,
@@ -198,8 +200,8 @@ export function createVoiceHandlers(deps: VoiceHandlerDeps) {
 
   async function handleApprove(ctx: Context, chatId: string) {
     const pending = getPendingTask(chatId);
-    if (!pending) {
-      await ctx.answerCallbackQuery({ text: "No pending task found." });
+    if (!pending || pending.state !== "awaiting_transcript_approval") {
+      await ctx.answerCallbackQuery({ text: "Expired or wrong state." });
       return;
     }
 
@@ -229,8 +231,8 @@ export function createVoiceHandlers(deps: VoiceHandlerDeps) {
 
   async function handleEdit(ctx: Context, chatId: string) {
     const pending = getPendingTask(chatId);
-    if (!pending) {
-      await ctx.answerCallbackQuery({ text: "No pending task found." });
+    if (!pending || pending.state !== "awaiting_transcript_approval") {
+      await ctx.answerCallbackQuery({ text: "Expired or wrong state." });
       return;
     }
 

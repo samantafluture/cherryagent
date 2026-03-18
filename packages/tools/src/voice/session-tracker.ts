@@ -54,7 +54,7 @@ export function getPendingTask(chatId: string): PendingVoiceTask | null {
   const task = pendingTasks.get(chatId);
   if (!task) return null;
 
-  if (Date.now() - task.createdAt > PENDING_TIMEOUT_MS) {
+  if (Date.now() - task.updatedAt > PENDING_TIMEOUT_MS) {
     pendingTasks.delete(chatId);
     return null;
   }
@@ -70,10 +70,10 @@ export function updatePendingTask(
   chatId: string,
   updates: Partial<Omit<PendingVoiceTask, "chatId">>,
 ): PendingVoiceTask | null {
-  const task = pendingTasks.get(chatId);
+  const task = getPendingTask(chatId);
   if (!task) return null;
 
-  Object.assign(task, updates);
+  Object.assign(task, updates, { updatedAt: Date.now() });
   return task;
 }
 
