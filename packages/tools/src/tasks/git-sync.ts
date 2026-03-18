@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { access } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
@@ -19,6 +19,13 @@ export interface GitSyncResult {
  * message matches TASK_COMMIT_MSG.
  */
 export async function commitAndPush(repoPath: string): Promise<GitSyncResult> {
+  // Guard: refuse to commit an empty or corrupted task file
+  const taskFilePath = join(repoPath, ".claude/tasks.md");
+  const content = await readFile(taskFilePath, "utf-8").catch(() => "");
+  if (!content.trim() || !content.includes("# Project:")) {
+    return { action: "no-change", message: "Skipped commit: task file is empty or corrupted" };
+  }
+
   // Stage the task file
   await git(repoPath, ["add", ".claude/tasks.md"]);
 
@@ -74,6 +81,10 @@ export async function pullChanges(repoPath: string): Promise<GitSyncResult> {
 
   try {
     await git(repoPath, ["pull", "--rebase=false"]);
+
+    // Post-pull guard: if the task file became empty after pull, restore from history
+    await repairEmptyTaskFile(repoPath);
+
     return { action: "pulled", message: "Pulled latest changes" };
   } catch (err) {
     const error = err as Error & { stderr?: string };
@@ -116,6 +127,29 @@ export async function pullAllProjects(
   }
 
   return results;
+}
+
+/**
+ * If the task file is empty or missing its header, restore from the most recent
+ * non-empty version in git history. This prevents corrupted files from being
+ * committed and propagated.
+ */
+async function repairEmptyTaskFile(repoPath: string): Promise<void> {
+  const taskFilePath = join(repoPath, ".claude/tasks.md");
+  const content = await readFile(taskFilePath, "utf-8").catch(() => "");
+  if (content.trim() && content.includes("# Project:")) return; // file is fine
+
+  // Try to restore from the previous commit
+  try {
+    const { stdout: restored } = await git(repoPath, ["show", "HEAD~1:.claude/tasks.md"]);
+    if (restored.trim() && restored.includes("# Project:")) {
+      const { writeFile } = await import("node:fs/promises");
+      await writeFile(taskFilePath, restored, "utf-8");
+      console.warn(`[git-sync] Repaired empty task file in ${repoPath} from HEAD~1`);
+    }
+  } catch {
+    // No prior version available, nothing to restore
+  }
 }
 
 async function git(cwd: string, args: string[]) {

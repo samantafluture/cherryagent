@@ -1,4 +1,5 @@
-import { readFileSync, writeFileSync } from "fs";
+import { readFileSync, writeFileSync, renameSync } from "fs";
+import { dirname, join } from "path";
 import type { Task, TaskFile, Priority, Size, TaskStatus } from "./types.js";
 import { parseTaskFile } from "./parser.js";
 import { serializeTaskFile } from "./serializer.js";
@@ -6,12 +7,39 @@ import { createHash } from "crypto";
 
 export function loadTaskFile(filePath: string): TaskFile {
   const content = readFileSync(filePath, "utf-8");
+  // If file is empty or corrupted, return a minimal structure instead of
+  // parsing garbage that could later be saved and committed
+  if (!content.trim() || !content.includes("# Project:")) {
+    const slug = filePath.split("/").at(-3) ?? "Unknown";
+    return {
+      projectName: slug,
+      lastSyncedToRepo: "—",
+      lastAgentUpdate: "—",
+      sections: {
+        activeP0: { tasks: [], freeformLines: [] },
+        activeP1: { tasks: [], freeformLines: [] },
+        activeP2: { tasks: [], freeformLines: [] },
+        blocked: { tasks: [], freeformLines: [] },
+        completed: { tasks: [], freeformLines: [] },
+        notes: [],
+      },
+    };
+  }
   return parseTaskFile(content);
 }
 
 export function saveTaskFile(filePath: string, file: TaskFile): void {
   const content = serializeTaskFile(file);
-  writeFileSync(filePath, content, "utf-8");
+
+  // Guard: never write empty or header-less content (prevents corruption on crash)
+  if (!content.includes("# Project:")) {
+    throw new Error(`Refusing to save corrupted task file to ${filePath}: missing project header`);
+  }
+
+  // Atomic write: write to temp file, then rename (rename is atomic on POSIX)
+  const tmpPath = join(dirname(filePath), `.tasks.md.tmp.${process.pid}`);
+  writeFileSync(tmpPath, content, "utf-8");
+  renameSync(tmpPath, filePath);
 }
 
 export function addTask(
