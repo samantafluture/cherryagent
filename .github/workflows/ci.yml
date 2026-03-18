@@ -43,7 +43,7 @@ jobs:
       - uses: appleboy/ssh-action@v1
         with:
           host: 187.124.67.117
-          port: 8443
+          port: 22
           username: sam
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
