@@ -1,6 +1,6 @@
 # Project: CherryAgent
 
-> Last synced to repo: 2026-03-18T18:40:01+00:00
+> Last synced to repo: 2026-03-18T19:30:01+00:00
 > Last agent update: 2026-03-18
 
 ## Active Sprint
@@ -18,7 +18,6 @@
 - After project selected, auto-detect task type from transcript (keep existing priority-based detection)
 - Show confirmation: "Project: X — Type: fix — Ready to run?" with ✅ Go / ❌ Cancel
 - This replaces the fragile keyword matching for project identification
-- [ ] Create new workflow flow energy accounting management via spoon theory (Sam will provide prompts and details)
 - [ ] Voice: add transcript approval/edit step before running agent
 - [ ] Voice: add project selection via inline keyboard buttons
 
@@ -36,6 +35,7 @@
 ## Blocked
 
 ## Completed (recent)
+- [x] Create new workflow flow energy accounting management via spoon theory (Sam will provide prompts and details) ✅ 2026-03-18
 - [x] Fix bug on bot answer - name appears as Unknown when listing all ✅ 2026-03-18
 - [x] Voice: replace Claude CLI with Gemini Flash agent, GitHub API for PRs ✅ 2026-03-18
 - [x] Fix bug — /task cherryagent showed Unknown as project name ✅ 2026-03-15
