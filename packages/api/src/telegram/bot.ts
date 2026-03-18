@@ -128,10 +128,12 @@ export function createBot(deps: BotDeps) {
     return foodHandlers.handlePhoto(ctx);
   });
 
-  // Text handler — check spoon pending first, then fall through to food
+  // Text handler — voice edit → spoon → food
   bot.on("message:text", async (ctx) => {
-    const handled = await spoonHandlers.handleText(ctx);
-    if (!handled) return foodHandlers.handleText(ctx);
+    const voiceHandled = await voiceHandlers.handleVoiceText(ctx);
+    if (voiceHandled) return;
+    const spoonHandled = await spoonHandlers.handleText(ctx);
+    if (!spoonHandled) return foodHandlers.handleText(ctx);
   });
 
   // Callback queries (confirmation buttons)

@@ -81,12 +81,20 @@ export {
 export type {
   VoiceIntent,
   VoiceSession,
+  PendingVoiceTask,
+  PendingState,
   AgentRunResult,
   ClaudeRunResult,
   PrResult,
   ProjectMapping,
 } from "./voice/index.js";
-export { parseIntent, getDefaultProjectMappings } from "./voice/index.js";
+export {
+  parseIntent,
+  getDefaultProjectMappings,
+  detectTaskType,
+  generateBranchName,
+  generatePrTitle,
+} from "./voice/index.js";
 export { runGeminiAgent } from "./voice/index.js";
 export type { AgentLLMProvider } from "./voice/index.js";
 export {
@@ -103,6 +111,10 @@ export {
   updateSession,
   deleteSession,
   getAllSessions,
+  getPendingTask,
+  setPendingTask,
+  updatePendingTask,
+  deletePendingTask,
 } from "./voice/index.js";
 
 // Spoon
