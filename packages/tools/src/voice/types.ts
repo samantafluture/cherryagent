@@ -19,6 +19,24 @@ export interface VoiceSession {
   updatedAt: number;
 }
 
+export type PendingState =
+  | "awaiting_transcript_approval"
+  | "awaiting_transcript_edit"
+  | "awaiting_project_selection"
+  | "awaiting_confirmation";
+
+export interface PendingVoiceTask {
+  chatId: string;
+  transcript: string;
+  state: PendingState;
+  project?: string;
+  repoPath?: string;
+  taskType?: VoiceIntent["taskType"];
+  branchName?: string;
+  prTitle?: string;
+  createdAt: number;
+}
+
 export interface AgentRunResult {
   success: boolean;
   output: string;

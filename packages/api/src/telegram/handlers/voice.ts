@@ -1,8 +1,12 @@
+import { existsSync } from "node:fs";
 import type { Context } from "grammy";
 import { InlineKeyboard } from "grammy";
 import type { GeminiProvider } from "@cherryagent/core";
 import {
-  parseIntent,
+  getDefaultProjectMappings,
+  detectTaskType,
+  generateBranchName,
+  generatePrTitle,
   runGeminiAgent,
   createBranchAndPush,
   pushExistingBranch,
@@ -14,6 +18,10 @@ import {
   createSession,
   updateSession,
   deleteSession,
+  getPendingTask,
+  setPendingTask,
+  updatePendingTask,
+  deletePendingTask,
   logCost,
 } from "@cherryagent/tools";
 import type { VoiceIntent } from "@cherryagent/tools";
@@ -32,9 +40,8 @@ interface VoiceHandlerDeps {
 export function createVoiceHandlers(deps: VoiceHandlerDeps) {
   const { gemini, botToken } = deps;
 
-  /**
-   * Handle incoming voice messages — main entry point.
-   */
+  // ─── Voice message entry point ────────────────────────────────
+
   async function handleVoice(ctx: Context) {
     const voice = ctx.message?.voice;
     if (!voice) return;
@@ -80,32 +87,252 @@ export function createVoiceHandlers(deps: VoiceHandlerDeps) {
         deps.costConfig?.timezone,
       );
 
-      await ctx.reply(
-        `📝 <b>Transcript:</b>\n<blockquote>${escapeHtml(transcript)}</blockquote>`,
-        { parse_mode: "HTML" },
-      );
-
-      // 3. Follow-up on existing session or parse new intent
+      // 3. Follow-up on existing session — skip approval flow
       if (existingSession) {
+        await ctx.reply(
+          `📝 <b>Transcript:</b>\n<blockquote>${escapeHtml(transcript)}</blockquote>`,
+          { parse_mode: "HTML" },
+        );
         return handleFollowUp(ctx, existingSession, transcript);
       }
 
-      // 4. Parse intent
-      const intent = parseIntent(transcript);
-      if (!intent) {
-        return ctx.reply(
-          "Could not identify a project from the transcript.\n\n" +
-            "Mention a project name: cherrytree, surpride, fincherry, blog, cherryagent",
-        );
-      }
+      // 4. Show transcript and ask for approval
+      setPendingTask({
+        chatId,
+        transcript,
+        state: "awaiting_transcript_approval",
+        createdAt: Date.now(),
+      });
+
+      const keyboard = new InlineKeyboard()
+        .text("✅ Approve", "voice_approve")
+        .text("✏️ Edit", "voice_edit")
+        .text("❌ Cancel", "voice_cancel");
 
       await ctx.reply(
-        `🎯 <b>${escapeHtml(intent.project)}</b> — ${intent.taskType}\n` +
-          `Branch: <code>${escapeHtml(intent.branchName)}</code>`,
+        `📝 <b>Transcript:</b>\n<blockquote>${escapeHtml(transcript)}</blockquote>\n\n` +
+          "Does this look correct?",
+        { parse_mode: "HTML", reply_markup: keyboard },
+      );
+    } catch (err) {
+      console.error("[voice] Pipeline error:", err);
+      const message = err instanceof Error ? err.message : String(err);
+      await ctx.reply(
+        `❌ Voice pipeline error:\n<pre>${escapeHtml(message).slice(0, 300)}</pre>`,
         { parse_mode: "HTML" },
       );
+    }
+  }
 
-      // 5. Run Gemini agent
+  // ─── Text handler for transcript edits ────────────────────────
+
+  async function handleVoiceText(ctx: Context): Promise<boolean> {
+    const chatId = String(ctx.chat?.id);
+    const pending = getPendingTask(chatId);
+
+    if (!pending || pending.state !== "awaiting_transcript_edit") {
+      return false; // Not a voice edit — let other handlers process
+    }
+
+    const newTranscript = ctx.message?.text?.trim();
+    if (!newTranscript) return false;
+
+    // Update transcript and go back to approval
+    updatePendingTask(chatId, {
+      transcript: newTranscript,
+      state: "awaiting_transcript_approval",
+    });
+
+    const keyboard = new InlineKeyboard()
+      .text("✅ Approve", "voice_approve")
+      .text("✏️ Edit", "voice_edit")
+      .text("❌ Cancel", "voice_cancel");
+
+    await ctx.reply(
+      `📝 <b>Updated transcript:</b>\n<blockquote>${escapeHtml(newTranscript)}</blockquote>\n\n` +
+        "Does this look correct?",
+      { parse_mode: "HTML", reply_markup: keyboard },
+    );
+
+    return true; // Handled
+  }
+
+  // ─── Callback router ─────────────────────────────────────────
+
+  async function handleVoiceCallback(ctx: Context) {
+    const data = ctx.callbackQuery?.data ?? "";
+    const chatId = String(ctx.callbackQuery?.message?.chat.id);
+
+    // Transcript approval flow
+    if (data === "voice_approve") return handleApprove(ctx, chatId);
+    if (data === "voice_edit") return handleEdit(ctx, chatId);
+    if (data === "voice_cancel") return handleCancel(ctx, chatId);
+
+    // Project selection
+    if (data.startsWith("voice_project_")) {
+      const slug = data.replace("voice_project_", "");
+      return handleProjectSelected(ctx, chatId, slug);
+    }
+
+    // Confirmation
+    if (data === "voice_go") return handleGo(ctx, chatId);
+
+    // Active session actions
+    if (data === "voice_merge") return handleMergeAction(ctx, chatId);
+    if (data === "voice_close") return handleCloseAction(ctx, chatId);
+    if (data === "voice_newtask") {
+      deleteSession(chatId);
+      deletePendingTask(chatId);
+      await ctx.answerCallbackQuery({ text: "Session cleared!" });
+      return ctx.reply("🎙️ Session reset. Send a new voice note to start a fresh task.");
+    }
+    if (data === "voice_followup") {
+      await ctx.answerCallbackQuery({ text: "Send another voice note to follow up!" });
+      return ctx.reply("🎙️ Send a voice note to continue working on this task.");
+    }
+
+    await ctx.answerCallbackQuery();
+  }
+
+  // ─── Transcript approval handlers ─────────────────────────────
+
+  async function handleApprove(ctx: Context, chatId: string) {
+    const pending = getPendingTask(chatId);
+    if (!pending) {
+      await ctx.answerCallbackQuery({ text: "No pending task found." });
+      return;
+    }
+
+    await ctx.answerCallbackQuery({ text: "Transcript approved!" });
+
+    // Show project selection buttons
+    updatePendingTask(chatId, { state: "awaiting_project_selection" });
+
+    const mappings = getDefaultProjectMappings();
+    const available = mappings.filter((m) => existsSync(m.repoPath));
+
+    if (available.length === 0) {
+      deletePendingTask(chatId);
+      return ctx.reply(
+        "No project repos found. Check VOICE_REPO_BASE_PATH env var.",
+      );
+    }
+
+    const keyboard = new InlineKeyboard();
+    for (const mapping of available) {
+      keyboard.text(projectIcon(mapping.slug) + " " + mapping.slug, `voice_project_${mapping.slug}`).row();
+    }
+    keyboard.text("❌ Cancel", "voice_cancel");
+
+    await ctx.reply("Which project is this for?", { reply_markup: keyboard });
+  }
+
+  async function handleEdit(ctx: Context, chatId: string) {
+    const pending = getPendingTask(chatId);
+    if (!pending) {
+      await ctx.answerCallbackQuery({ text: "No pending task found." });
+      return;
+    }
+
+    await ctx.answerCallbackQuery({ text: "Send the corrected text." });
+    updatePendingTask(chatId, { state: "awaiting_transcript_edit" });
+
+    await ctx.reply(
+      "✏️ Send a text message with the corrected task description.\n\n" +
+        `Current:\n<blockquote>${escapeHtml(pending.transcript)}</blockquote>`,
+      { parse_mode: "HTML" },
+    );
+  }
+
+  async function handleCancel(ctx: Context, chatId: string) {
+    deletePendingTask(chatId);
+    await ctx.answerCallbackQuery({ text: "Cancelled." });
+    await ctx.reply("Cancelled. Send a new voice note to start over.");
+  }
+
+  // ─── Project selection handler ────────────────────────────────
+
+  async function handleProjectSelected(ctx: Context, chatId: string, slug: string) {
+    const pending = getPendingTask(chatId);
+    if (!pending || pending.state !== "awaiting_project_selection") {
+      await ctx.answerCallbackQuery({ text: "No pending task found." });
+      return;
+    }
+
+    const mappings = getDefaultProjectMappings();
+    const mapping = mappings.find((m) => m.slug === slug);
+    if (!mapping) {
+      await ctx.answerCallbackQuery({ text: "Project not found." });
+      return;
+    }
+
+    await ctx.answerCallbackQuery({ text: `Selected: ${slug}` });
+
+    // Detect task type and generate branch/PR info
+    const taskType = detectTaskType(pending.transcript);
+    const branchName = generateBranchName(taskType, pending.transcript);
+    const prTitle = generatePrTitle(taskType, pending.transcript);
+
+    updatePendingTask(chatId, {
+      state: "awaiting_confirmation",
+      project: slug,
+      repoPath: mapping.repoPath,
+      taskType,
+      branchName,
+      prTitle,
+    });
+
+    const keyboard = new InlineKeyboard()
+      .text("✅ Go", "voice_go")
+      .text("❌ Cancel", "voice_cancel");
+
+    await ctx.reply(
+      `🎯 <b>Ready to run</b>\n\n` +
+        `<b>Project:</b> ${projectIcon(slug)} ${escapeHtml(slug)}\n` +
+        `<b>Type:</b> ${taskType}\n` +
+        `<b>Branch:</b> <code>${escapeHtml(branchName)}</code>\n\n` +
+        `<blockquote>${escapeHtml(pending.transcript.slice(0, 200))}</blockquote>`,
+      { parse_mode: "HTML", reply_markup: keyboard },
+    );
+  }
+
+  // ─── Execute the task ─────────────────────────────────────────
+
+  async function handleGo(ctx: Context, chatId: string) {
+    const pending = getPendingTask(chatId);
+    if (
+      !pending ||
+      pending.state !== "awaiting_confirmation" ||
+      !pending.project ||
+      !pending.repoPath ||
+      !pending.taskType ||
+      !pending.branchName ||
+      !pending.prTitle
+    ) {
+      await ctx.answerCallbackQuery({ text: "No confirmed task to run." });
+      return;
+    }
+
+    await ctx.answerCallbackQuery({ text: "Running agent…" });
+    deletePendingTask(chatId);
+
+    const intent: VoiceIntent = {
+      project: pending.project,
+      repoPath: pending.repoPath,
+      taskType: pending.taskType,
+      branchName: pending.branchName,
+      prTitle: pending.prTitle,
+      taskDescription: pending.transcript,
+      transcript: pending.transcript,
+    };
+
+    await runVoicePipeline(ctx, chatId, intent);
+  }
+
+  // ─── Core pipeline (shared between new task and follow-up) ────
+
+  async function runVoicePipeline(ctx: Context, chatId: string, intent: VoiceIntent) {
+    try {
       await ctx.reply("⏳ Running Gemini agent…");
       const result = await runGeminiAgent({
         gemini,
@@ -140,22 +367,22 @@ export function createVoiceHandlers(deps: VoiceHandlerDeps) {
         return ctx.reply("Agent ran but made no changes.");
       }
 
-      // 6. Create branch, commit, push
+      // Create branch, commit, push
       const pushed = await createBranchAndPush({
         repoPath: intent.repoPath,
         branchName: intent.branchName,
-        commitMessage: `${intent.prTitle}\n\nVoice transcript: ${transcript}`,
+        commitMessage: `${intent.prTitle}\n\nVoice transcript: ${intent.transcript}`,
       });
 
       if (!pushed) {
         return ctx.reply("No changes to push after agent ran.");
       }
 
-      // 7. Create draft PR
+      // Create draft PR
       const pr = await createDraftPr({
         repoPath: intent.repoPath,
         title: intent.prTitle,
-        body: formatPrBody(transcript, result.output),
+        body: formatPrBody(intent.transcript, result.output),
       });
 
       if (!pr.success) {
@@ -166,7 +393,7 @@ export function createVoiceHandlers(deps: VoiceHandlerDeps) {
         );
       }
 
-      // 8. Store session for follow-ups
+      // Store session for follow-ups
       createSession({
         chatId,
         project: intent.project,
@@ -178,7 +405,6 @@ export function createVoiceHandlers(deps: VoiceHandlerDeps) {
         updatedAt: Date.now(),
       });
 
-      // 9. Send formatted response with inline keyboard
       await sendTaskComplete(ctx, intent, result.filesChanged, pr.prUrl);
     } catch (err) {
       console.error("[voice] Pipeline error:", err);
@@ -190,15 +416,13 @@ export function createVoiceHandlers(deps: VoiceHandlerDeps) {
     }
   }
 
-  /**
-   * Handle follow-up voice notes on an existing session.
-   */
+  // ─── Follow-up on existing session ────────────────────────────
+
   async function handleFollowUp(
     ctx: Context,
     session: ReturnType<typeof getActiveSession> & object,
     transcript: string,
   ) {
-    // Validate branch still exists before running agent
     const branchExists = await remoteBranchExists(session.repoPath, session.branchName);
     if (!branchExists) {
       deleteSession(session.chatId);
@@ -230,7 +454,6 @@ export function createVoiceHandlers(deps: VoiceHandlerDeps) {
       );
     }
 
-    // Track agent cost
     if (result.usage) {
       const agentCost =
         (result.usage.inputTokens * gemini.inputCostPer1M +
@@ -264,52 +487,32 @@ export function createVoiceHandlers(deps: VoiceHandlerDeps) {
     );
   }
 
-  /**
-   * Handle inline keyboard button presses for voice tasks.
-   */
-  async function handleVoiceCallback(ctx: Context) {
-    const data = ctx.callbackQuery?.data ?? "";
-    const chatId = String(ctx.callbackQuery?.message?.chat.id);
+  // ─── /voicereset command ──────────────────────────────────────
 
-    if (data === "voice_merge") {
-      return handleMergeAction(ctx, chatId);
-    }
-    if (data === "voice_close") {
-      return handleCloseAction(ctx, chatId);
-    }
-    if (data === "voice_newtask") {
-      deleteSession(chatId);
-      await ctx.answerCallbackQuery({ text: "Session cleared!" });
-      return ctx.reply("🎙️ Session reset. Send a new voice note to start a fresh task.");
-    }
-    if (data === "voice_followup") {
-      await ctx.answerCallbackQuery({
-        text: "Send another voice note to follow up!",
-      });
-      return ctx.reply("🎙️ Send a voice note to continue working on this task.");
-    }
-
-    await ctx.answerCallbackQuery();
-  }
-
-  /**
-   * Handle /voicereset command — clear active session.
-   */
   async function handleVoiceReset(ctx: Context) {
     const chatId = String(ctx.chat?.id);
     const session = getActiveSession(chatId);
+    const pending = getPendingTask(chatId);
 
-    if (!session) {
+    if (!session && !pending) {
       return ctx.reply("No active voice session to reset.");
     }
 
     deleteSession(chatId);
-    return ctx.reply(
-      `Session cleared for <b>${escapeHtml(session.project)}</b> / <code>${escapeHtml(session.branchName)}</code>.\n` +
-        "Send a new voice note to start a fresh task.",
-      { parse_mode: "HTML" },
-    );
+    deletePendingTask(chatId);
+
+    if (session) {
+      return ctx.reply(
+        `Session cleared for <b>${escapeHtml(session.project)}</b> / <code>${escapeHtml(session.branchName)}</code>.\n` +
+          "Send a new voice note to start a fresh task.",
+        { parse_mode: "HTML" },
+      );
+    }
+
+    return ctx.reply("Pending task cleared. Send a new voice note to start over.");
   }
+
+  // ─── Merge / Close actions ────────────────────────────────────
 
   async function handleMergeAction(ctx: Context, chatId: string) {
     const session = getActiveSession(chatId);
@@ -370,7 +573,21 @@ export function createVoiceHandlers(deps: VoiceHandlerDeps) {
     }
   }
 
-  return { handleVoice, handleVoiceCallback, handleVoiceReset };
+  return { handleVoice, handleVoiceText, handleVoiceCallback, handleVoiceReset };
+}
+
+// ─── Helpers ──────────────────────────────────────────────────
+
+const PROJECT_ICONS: Record<string, string> = {
+  cherryagent: "🍒",
+  cherrytree: "🌳",
+  fincherry: "💰",
+  saminprogress: "💬",
+  surpride: "🏳️‍🌈",
+};
+
+function projectIcon(slug: string): string {
+  return PROJECT_ICONS[slug] ?? "📁";
 }
 
 function sendTaskComplete(
@@ -382,7 +599,7 @@ function sendTaskComplete(
   const lines = [
     "<b>✅ Task Complete</b>",
     "",
-    `<b>Project:</b> ${escapeHtml(intent.project)}`,
+    `<b>Project:</b> ${projectIcon(intent.project)} ${escapeHtml(intent.project)}`,
     `<b>Branch:</b> <code>${escapeHtml(intent.branchName)}</code>`,
     `<b>Files changed:</b> ${filesChanged}`,
     "",

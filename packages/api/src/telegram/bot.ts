@@ -123,8 +123,13 @@ export function createBot(deps: BotDeps) {
     return foodHandlers.handlePhoto(ctx);
   });
 
-  // Text handler (natural language or barcode number)
-  bot.on("message:text", foodHandlers.handleText);
+  // Text handler — voice edit intercepts before food handler
+  bot.on("message:text", async (ctx) => {
+    const handled = await voiceHandlers.handleVoiceText(ctx);
+    if (!handled) {
+      return foodHandlers.handleText(ctx);
+    }
+  });
 
   // Callback queries (confirmation buttons)
   bot.on("callback_query:data", async (ctx) => {

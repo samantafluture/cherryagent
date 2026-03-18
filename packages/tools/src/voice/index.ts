@@ -1,13 +1,15 @@
 export type {
   VoiceIntent,
   VoiceSession,
+  PendingVoiceTask,
+  PendingState,
   AgentRunResult,
   ClaudeRunResult,
   PrResult,
   ProjectMapping,
 } from "./types.js";
 
-export { parseIntent, getDefaultProjectMappings } from "./intent-parser.js";
+export { parseIntent, getDefaultProjectMappings, detectTaskType, generateBranchName, generatePrTitle } from "./intent-parser.js";
 export { runGeminiAgent } from "./gemini-agent.js";
 export type { AgentLLMProvider } from "./gemini-agent.js";
 export {
@@ -24,4 +26,8 @@ export {
   updateSession,
   deleteSession,
   getAllSessions,
+  getPendingTask,
+  setPendingTask,
+  updatePendingTask,
+  deletePendingTask,
 } from "./session-tracker.js";

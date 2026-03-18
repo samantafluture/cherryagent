@@ -169,4 +169,29 @@ function generatePrTitle(
   return `${prefix}: ${desc.charAt(0).toLowerCase()}${desc.slice(1)}`;
 }
 
+/**
+ * Detect task type from transcript text using priority-based keyword matching.
+ */
+export function detectTaskType(transcript: string): VoiceIntent["taskType"] {
+  const lower = transcript.toLowerCase();
+  let taskType: VoiceIntent["taskType"] = "feature";
+  let bestPriority = TASK_TYPE_PRIORITY.feature;
+
+  for (const [type, keywords] of Object.entries(TASK_TYPE_KEYWORDS)) {
+    for (const keyword of keywords) {
+      if (lower.includes(keyword)) {
+        const priority = TASK_TYPE_PRIORITY[type as VoiceIntent["taskType"]];
+        if (priority < bestPriority) {
+          taskType = type as VoiceIntent["taskType"];
+          bestPriority = priority;
+        }
+        break;
+      }
+    }
+  }
+
+  return taskType;
+}
+
 export { buildDefaultMappings as getDefaultProjectMappings };
+export { generateBranchName, generatePrTitle };
