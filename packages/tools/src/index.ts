@@ -105,6 +105,11 @@ export {
   getAllSessions,
 } from "./voice/index.js";
 
+// Spoon
+export type { SpoonEntry } from "./spoon/spoon-tracker.js";
+export { logSpoon, getSpoonForDate, getSpoonForRange } from "./spoon/spoon-tracker.js";
+export { formatSpoonReport } from "./spoon/spoon-report.js";
+
 // Media
 export type {
   YouTubeMode,

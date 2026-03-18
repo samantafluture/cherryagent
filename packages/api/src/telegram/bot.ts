@@ -8,6 +8,7 @@ import { createInspirationHandlers } from "./handlers/inspiration.js";
 import { createTaskHandlers } from "./handlers/tasks.js";
 import { createBlogHandlers } from "./handlers/blog.js";
 import { createVoiceHandlers } from "./handlers/voice.js";
+import { createSpoonHandlers } from "./handlers/spoon.js";
 import type { GeminiProvider, GroqWhisperClient } from "@cherryagent/core";
 import type { FitbitAuth, MediaConfig } from "@cherryagent/tools";
 
@@ -57,6 +58,8 @@ export function createBot(deps: BotDeps) {
   const taskHandlers = createTaskHandlers();
   const blogHandlers = createBlogHandlers();
 
+  const spoonHandlers = createSpoonHandlers();
+
   const voiceHandlers = createVoiceHandlers({
     gemini: deps.gemini,
     botToken: deps.token,
@@ -92,6 +95,7 @@ export function createBot(deps: BotDeps) {
   bot.command("tasks", taskHandlers.handleTasksCommand);
   bot.command("task", taskHandlers.handleTaskCommand);
   bot.command("blog", blogHandlers.handleBlogCommand);
+  bot.command("spoon", spoonHandlers.handleSpoonCommand);
   bot.command("voicereset", voiceHandlers.handleVoiceReset);
   if (inspoHandlers) {
     bot.command("inspo", inspoHandlers.handleInspoCommand);
@@ -108,6 +112,7 @@ export function createBot(deps: BotDeps) {
     { command: "tasks", description: "View tasks — /tasks all or /tasks <project>" },
     { command: "task", description: "Manage tasks — add, done, wip, block, etc." },
     { command: "blog", description: "Blog — ideas, drafts, status" },
+    { command: "spoon", description: "Spoon tracker — morning/evening check-in, report" },
     { command: "voicereset", description: "Clear active voice coding session" },
   ]);
 
@@ -123,14 +128,20 @@ export function createBot(deps: BotDeps) {
     return foodHandlers.handlePhoto(ctx);
   });
 
-  // Text handler (natural language or barcode number)
-  bot.on("message:text", foodHandlers.handleText);
+  // Text handler — check spoon pending first, then fall through to food
+  bot.on("message:text", async (ctx) => {
+    const handled = await spoonHandlers.handleText(ctx);
+    if (!handled) return foodHandlers.handleText(ctx);
+  });
 
   // Callback queries (confirmation buttons)
   bot.on("callback_query:data", async (ctx) => {
     const data = ctx.callbackQuery?.data ?? "";
     if (data.startsWith("task_")) {
       return taskHandlers.handleTaskCallback(ctx);
+    }
+    if (data.startsWith("spoon_")) {
+      return spoonHandlers.handleCallback(ctx);
     }
     if (data.startsWith("voice_")) {
       return voiceHandlers.handleVoiceCallback(ctx);
