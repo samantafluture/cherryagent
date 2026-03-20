@@ -583,9 +583,14 @@ export function createVoiceHandlers(deps: VoiceHandlerDeps) {
 const PROJECT_ICONS: Record<string, string> = {
   cherryagent: "🍒",
   cherrytree: "🌳",
+  cherryops: "⚙️",
+  devtwin: "🤖",
   fincherry: "💰",
+  recordoc: "▶️",
   saminprogress: "💬",
-  surpride: "🏳️‍🌈",
+  "samantafluture-site": "🌐",
+  "surpride-app": "🏳️‍🌈",
+  "voila-prep": "🇫🇷",
 };
 
 function projectIcon(slug: string): string {

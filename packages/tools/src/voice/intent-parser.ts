@@ -1,42 +1,57 @@
-import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readdirSync, statSync } from "node:fs";
+import { resolve } from "node:path";
 import type { ProjectMapping, VoiceIntent } from "./types.js";
 
 const DEFAULT_REPO_BASE_PATH = "/home/sam/apps";
 
 function getRepoBasePath(): string {
-  return process.env.VOICE_REPO_BASE_PATH ?? DEFAULT_REPO_BASE_PATH;
+  return process.env.VOICE_REPO_BASE_PATH ?? process.env.PROJECTS_BASE ?? DEFAULT_REPO_BASE_PATH;
 }
 
+/**
+ * Discover projects dynamically by scanning the repo base path
+ * for directories that contain .claude/tasks.md and .git.
+ * Same discovery logic as the tasks module, but uses VOICE_REPO_BASE_PATH.
+ */
 function buildDefaultMappings(): ProjectMapping[] {
   const base = getRepoBasePath();
-  return [
-    {
-      slug: "cherrytree",
-      keywords: ["cherrytree", "cherry tree", "main site", "portfolio"],
-      repoPath: join(base, "cherrytree"),
-    },
-    {
-      slug: "surpride",
-      keywords: ["surpride", "wix migration", "wix"],
-      repoPath: join(base, "surpride-wix-migration"),
-    },
-    {
-      slug: "fincherry",
-      keywords: ["fincherry", "fin cherry", "finance"],
-      repoPath: join(base, "fincherry"),
-    },
-    {
-      slug: "saminprogress",
-      keywords: ["blog", "saminprogress", "sam in progress"],
-      repoPath: join(base, "saminprogress"),
-    },
-    {
-      slug: "cherryagent",
-      keywords: ["cherryagent", "cherry agent", "agent", "bot"],
-      repoPath: join(base, "cherryagent"),
-    },
-  ];
+  const mappings: ProjectMapping[] = [];
+
+  try {
+    const entries = readdirSync(base);
+    for (const entry of entries) {
+      const fullPath = resolve(base, entry);
+      try {
+        if (statSync(fullPath).isDirectory()) {
+          const taskFile = resolve(fullPath, ".claude/tasks.md");
+          const gitDir = resolve(fullPath, ".git");
+          if (existsSync(taskFile) && existsSync(gitDir)) {
+            mappings.push({
+              slug: entry,
+              keywords: generateKeywords(entry),
+              repoPath: fullPath,
+            });
+          }
+        }
+      } catch {
+        // skip entries we can't stat
+      }
+    }
+  } catch {
+    // base path doesn't exist
+  }
+
+  return mappings;
+}
+
+function generateKeywords(slug: string): string[] {
+  const keywords = [slug];
+  const parts = slug.split("-");
+  if (parts.length > 1) {
+    keywords.push(...parts.filter((p) => p.length > 2));
+    keywords.push(parts.join(" "));
+  }
+  return keywords;
 }
 
 /** Priority weights for task type detection — lower number = higher priority */

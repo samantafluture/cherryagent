@@ -19,7 +19,13 @@ echo "==> Starting API container..."
 docker compose -f docker-compose.prod.yml up -d --force-recreate api
 
 echo "==> Reloading Nginx..."
-docker exec infra-nginx nginx -s reload
+if docker exec infra-nginx nginx -t 2>&1; then
+  docker exec infra-nginx nginx -s reload
+  echo "==> Nginx reloaded successfully."
+else
+  echo "==> WARNING: Nginx config test failed — skipping reload."
+  echo "==> Fix the nginx config on the VPS manually."
+fi
 
 echo "==> Waiting for health check..."
 MAX_RETRIES=10
