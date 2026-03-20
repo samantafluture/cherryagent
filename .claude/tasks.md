@@ -1,6 +1,6 @@
 # Project: CherryAgent
 
-> Last synced to repo: 2026-03-19T23:20:01+00:00
+> Last synced to repo: 2026-03-20T23:30:01+00:00
 > Last agent update: 2026-03-18
 
 ## Active Sprint
@@ -20,6 +20,7 @@
 - This replaces the fragile keyword matching for project identification
 - [ ] Voice: add transcript approval/edit step before running agent
 - [ ] Voice: add project selection via inline keyboard buttons
+- [ ] Fix blog command that is not persisting
 
 ### P1 — Should do this week
 - Current problem: raw transcript is too vague for Gemini Flash, it lacks direction
