@@ -1,25 +1,11 @@
 # Project: CherryAgent
 
 > Last synced to repo: 2026-03-20T23:30:01+00:00
-> Last agent update: 2026-03-18
+> Last agent update: 2026-03-20
 
 ## Active Sprint
 
 ### P0 — Must do now
-- After transcription, show inline keyboard: ✅ Approve / ✏️ Edit / ❌ Cancel
-- On Edit: wait for user's next text message as the corrected transcript, then re-show approval buttons
-- On Approve: continue pipeline with the (possibly edited) transcript
-- On Cancel: discard and reset
-- Needs a "pending approval" state in session tracker (transcript stored but not yet executed)
-- This blocks the other voice tasks because without it the pipeline runs on potentially wrong transcripts
-- After transcript is approved, show project buttons instead of parsing project from transcript
-- Build keyboard dynamically from `getDefaultProjectMappings()`, only show projects whose repo path exists
-- Each button: `voice_project_{slug}` callback data
-- After project selected, auto-detect task type from transcript (keep existing priority-based detection)
-- Show confirmation: "Project: X — Type: fix — Ready to run?" with ✅ Go / ❌ Cancel
-- This replaces the fragile keyword matching for project identification
-- [ ] Voice: add transcript approval/edit step before running agent
-- [ ] Voice: add project selection via inline keyboard buttons
 - [ ] Fix blog command that is not persisting
 
 ### P1 — Should do this week
@@ -36,6 +22,11 @@
 ## Blocked
 
 ## Completed (recent)
+- [x] Voice: replace hardcoded project list with dynamic discovery (fixes missing recordoc) ✅ 2026-03-20
+- [x] CI: make deploy resilient to nginx config errors ✅ 2026-03-20
+- [x] VPS: issue SSL cert for samantafluture.com + add ACME challenge to nginx config ✅ 2026-03-20
+- [x] Voice: add transcript approval/edit step before running agent ✅ 2026-03-20
+- [x] Voice: add project selection via inline keyboard buttons ✅ 2026-03-20
 - [x] Create new workflow flow energy accounting management via spoon theory (Sam will provide prompts and details) ✅ 2026-03-18
 - [x] Fix bug on bot answer - name appears as Unknown when listing all ✅ 2026-03-18
 - [x] Voice: replace Claude CLI with Gemini Flash agent, GitHub API for PRs ✅ 2026-03-18
