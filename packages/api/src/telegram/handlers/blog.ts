@@ -1,7 +1,7 @@
 import type { Context } from "grammy";
 import { readFileSync, writeFileSync, readdirSync, existsSync } from "fs";
 import { resolve, basename } from "path";
-import { listProjects, commitAndPush } from "@cherryagent/tools";
+import { listProjects, commitAndPushFiles } from "@cherryagent/tools";
 
 const BLOG_SLUG = "saminprogress";
 
@@ -112,7 +112,7 @@ export function createBlogHandlers() {
 
     // Git sync
     try {
-      await commitAndPush(repoPath);
+      await commitAndPushFiles(repoPath, ["src/drafts/ideas.md"], "chore: add blog idea");
     } catch (err) {
       console.error("[blog] Git sync failed:", err);
     }

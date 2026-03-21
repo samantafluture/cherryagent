@@ -152,6 +152,28 @@ async function repairEmptyTaskFile(repoPath: string): Promise<void> {
   }
 }
 
+/**
+ * Commit specific files and push to GitHub.
+ * Unlike commitAndPush, this stages arbitrary files and uses a custom message.
+ * No squashing or task-file guards.
+ */
+export async function commitAndPushFiles(
+  repoPath: string,
+  files: string[],
+  message: string,
+): Promise<GitSyncResult> {
+  await git(repoPath, ["add", ...files]);
+
+  const { stdout: diffOutput } = await git(repoPath, ["diff", "--cached", "--name-only"]);
+  if (!diffOutput.trim()) {
+    return { action: "no-change", message: "No changes to commit" };
+  }
+
+  await git(repoPath, ["commit", "-m", message]);
+  await git(repoPath, ["push"]);
+  return { action: "created", message: `Committed and pushed: ${message}` };
+}
+
 async function git(cwd: string, args: string[]) {
   return execFileAsync("git", args, { cwd, timeout: GIT_TIMEOUT });
 }

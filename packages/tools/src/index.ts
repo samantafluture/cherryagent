@@ -72,6 +72,7 @@ export {
   listProjects,
   getOverview,
   commitAndPush,
+  commitAndPushFiles,
   pullChanges,
   pullAllProjects,
   startSyncScheduler,
