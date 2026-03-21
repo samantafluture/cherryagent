@@ -1,7 +1,7 @@
 export interface VoiceIntent {
   project: string;
   repoPath: string;
-  taskType: "fix" | "feature" | "refactor" | "test" | "docs" | "investigate";
+  taskType: "fix" | "feature" | "refactor" | "test" | "docs" | "investigate" | "content" | "strategy";
   branchName: string;
   prTitle: string;
   taskDescription: string;
@@ -42,6 +42,7 @@ export interface AgentRunResult {
   success: boolean;
   output: string;
   filesChanged: number;
+  changedFiles: string[];
   error?: string;
   usage?: { inputTokens: number; outputTokens: number };
 }

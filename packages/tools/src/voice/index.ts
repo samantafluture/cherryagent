@@ -13,6 +13,7 @@ export { parseIntent, getDefaultProjectMappings, detectTaskType, generateBranchN
 export { runGeminiAgent } from "./gemini-agent.js";
 export type { AgentLLMProvider } from "./gemini-agent.js";
 export {
+  ensureCleanMain,
   createBranchAndPush,
   pushExistingBranch,
   createDraftPr,

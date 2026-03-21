@@ -61,7 +61,9 @@ const TASK_TYPE_PRIORITY: Record<VoiceIntent["taskType"], number> = {
   refactor: 3,
   docs: 4,
   investigate: 5,
-  feature: 6,
+  content: 6,
+  strategy: 7,
+  feature: 8,
 };
 
 const TASK_TYPE_KEYWORDS: Record<VoiceIntent["taskType"], string[]> = {
@@ -71,6 +73,8 @@ const TASK_TYPE_KEYWORDS: Record<VoiceIntent["taskType"], string[]> = {
   test: ["test", "spec", "coverage", "unit test"],
   docs: ["doc", "documentation", "readme", "comment", "jsdoc"],
   investigate: ["investigate", "check", "look", "find", "debug", "why"],
+  content: ["write", "blog", "post", "copy", "landing", "email", "newsletter", "article", "content"],
+  strategy: ["plan", "strategy", "growth", "marketing", "roadmap", "business", "analyze", "analysis", "proposal", "pitch"],
 };
 
 /**
@@ -159,6 +163,8 @@ function generatePrTitle(
     test: "test",
     docs: "docs",
     investigate: "chore",
+    content: "content",
+    strategy: "strategy",
   };
 
   const prefix = prefixMap[taskType] ?? "feat";

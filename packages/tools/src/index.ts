@@ -99,6 +99,7 @@ export {
 export { runGeminiAgent } from "./voice/index.js";
 export type { AgentLLMProvider } from "./voice/index.js";
 export {
+  ensureCleanMain,
   createBranchAndPush,
   pushExistingBranch,
   createDraftPr,
