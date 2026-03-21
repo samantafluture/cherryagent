@@ -1,7 +1,7 @@
 export interface VoiceIntent {
   project: string;
   repoPath: string;
-  taskType: "fix" | "feature" | "refactor" | "test" | "docs" | "investigate";
+  taskType: "fix" | "feature" | "refactor" | "test" | "docs" | "investigate" | "content" | "strategy";
   branchName: string;
   prTitle: string;
   taskDescription: string;

@@ -97,6 +97,16 @@ const CODE_EXTENSIONS = new Set([
   ".sh", ".sql", ".graphql", ".svelte", ".vue",
 ]);
 
+/** Broader set for non-code tasks (content, strategy, docs) */
+const ALL_TEXT_EXTENSIONS = new Set([
+  ...CODE_EXTENSIONS,
+  ".txt", ".csv", ".mdx", ".rst", ".adoc",
+  ".xml", ".svg", ".ini", ".cfg", ".conf",
+]);
+
+/** Task types that are not purely code-focused */
+const NON_CODE_TASK_TYPES = new Set(["content", "strategy", "docs"]);
+
 /** Files that provide essential repo context — always included first */
 const CONVENTION_FILES = [
   "CLAUDE.md",
@@ -119,7 +129,7 @@ export async function runGeminiAgent(opts: {
 
   try {
     // 1. Discover all files in the repo (paths only, for the planning step)
-    const allFilePaths = await discoverFiles(repoPath);
+    const allFilePaths = await discoverFiles(repoPath, taskType);
 
     // 2. Read convention files for context
     const conventionContents = await readConventionFiles(repoPath);
@@ -234,7 +244,18 @@ async function runPlanningPhase(
 
   const conventionContext = buildConventionContext(conventionContents);
 
-  const systemInstruction = `You are a coding assistant planning phase. Your task type is: ${taskType}.
+  const isNonCode = NON_CODE_TASK_TYPES.has(taskType);
+  const roleContext = isNonCode
+    ? "You are a project assistant planning phase. The task may involve writing content, strategy documents, or other non-code files."
+    : "You are a coding assistant planning phase.";
+
+  const fileGuidance = isNonCode
+    ? `- For content/strategy tasks, look for existing docs, markdown files, and README for context
+- Suggest creating new files in appropriate directories (e.g., docs/, content/, plans/)
+- Include any project config files that reveal the project's purpose and audience`
+    : `- Include files that might need modification AND files needed for context (imports, types, etc.)`;
+
+  const systemInstruction = `${roleContext} Your task type is: ${taskType}.
 
 You will receive a task description and a list of file paths in a repository.
 Your job is to identify which files need to be read to complete the task.
@@ -243,7 +264,7 @@ ${conventionContext}
 
 Rules:
 - Select only files that are directly relevant to the task
-- Include files that might need modification AND files needed for context (imports, types, etc.)
+${fileGuidance}
 - If the task requires creating new files, list them in filesToCreate
 - Keep the list focused — prefer fewer, more relevant files over many tangential ones
 - Maximum 20 files in relevantFiles`;
@@ -284,8 +305,9 @@ Rules:
   }
 }
 
-async function discoverFiles(repoPath: string): Promise<string[]> {
+async function discoverFiles(repoPath: string, taskType: string): Promise<string[]> {
   const files: string[] = [];
+  const extensions = NON_CODE_TASK_TYPES.has(taskType) ? ALL_TEXT_EXTENSIONS : CODE_EXTENSIONS;
 
   async function walk(dir: string) {
     if (files.length >= MAX_FILES_TO_READ) return;
@@ -303,7 +325,7 @@ async function discoverFiles(repoPath: string): Promise<string[]> {
         const ext = entry.name.includes(".")
           ? "." + entry.name.split(".").pop()!
           : "";
-        if (CODE_EXTENSIONS.has(ext) || entry.name === "package.json") {
+        if (extensions.has(ext) || entry.name === "package.json") {
           files.push(relative(repoPath, join(dir, entry.name)));
         }
       }
@@ -392,6 +414,8 @@ const TASK_TYPE_GUIDANCE: Record<string, string> = {
   test: "Write tests following existing test patterns. Cover edge cases and error paths.",
   docs: "Update or add documentation. Follow existing doc style and conventions.",
   investigate: "If investigation reveals a fix, implement it. Otherwise, add a clear comment explaining the finding.",
+  content: "Write or update content files (blog posts, copy, emails, landing pages). Use markdown format. Match the tone and style of existing content in the repo. Focus on clear, engaging writing.",
+  strategy: "Create a structured strategy document in markdown. Include sections like goals, analysis, action items, metrics, and timeline. Be specific and actionable — avoid generic advice. Reference existing project context when relevant.",
 };
 
 function buildSystemPrompt(
@@ -400,10 +424,24 @@ function buildSystemPrompt(
 ): string {
   const guidance = TASK_TYPE_GUIDANCE[taskType] ?? TASK_TYPE_GUIDANCE.feature;
   const conventionContext = buildConventionContext(conventionContents);
+  const isNonCode = NON_CODE_TASK_TYPES.has(taskType);
 
-  return `You are a coding agent. Your task type is: ${taskType}.
+  const role = isNonCode
+    ? `You are a versatile project agent. Your task type is: ${taskType}.`
+    : `You are a coding agent. Your task type is: ${taskType}.`;
 
-You will receive a task description, an approach plan, and the contents of relevant source files.
+  const codeRules = isNonCode
+    ? `- Write clear, well-structured markdown content
+- Match the tone and conventions of existing files in the repo
+- Create new files when appropriate (e.g., docs/growth-plan.md, content/blog-post.md)
+- Use proper markdown formatting: headings, lists, bold, blockquotes`
+    : `- Follow existing code style and conventions from the repository
+- Do not add unnecessary dependencies
+- Ensure the code compiles and is correct`;
+
+  return `${role}
+
+You will receive a task description, an approach plan, and the contents of relevant files.
 Produce the necessary file changes to complete the task.
 
 Task guidance: ${guidance}
@@ -414,10 +452,8 @@ Rules:
 - Only modify files that need changes
 - Return the COMPLETE content of each modified file (not diffs)
 - Keep changes minimal and focused on the task
-- Follow existing code style and conventions from the repository
-- Do not add unnecessary dependencies
-- Ensure the code compiles and is correct
-- You MUST produce at least one file change — if you cannot complete the task, modify the most relevant file with a TODO comment explaining what needs to be done
+${codeRules}
+- You MUST produce at least one file change — if you cannot complete the task, create a markdown file with a TODO explaining what needs to be done
 - Do NOT modify .claude/tasks.md or any task management files`;
 }
 
