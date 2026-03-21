@@ -1,12 +1,12 @@
 # Project: CherryAgent
 
-> Last synced to repo: 2026-03-20T23:30:01+00:00
+> Last synced to repo: 2026-03-21T15:40:01+00:00
 > Last agent update: 2026-03-20
 
 ## Active Sprint
 
 ### P0 — Must do now
-- [ ] Fix blog command that is not persisting
+- [ ] Voice: improve Gemini agent code quality with better context and prompting
 
 ### P1 — Should do this week
 - Current problem: raw transcript is too vague for Gemini Flash, it lacks direction
@@ -15,13 +15,13 @@
 - Fix 3: Include repo conventions in system prompt — read `CLAUDE.md`, `package.json`, `tsconfig.json` if they exist, and include them as context
 - Fix 4: Better system prompt — include task type-specific instructions (e.g. "for fix tasks, look for the bug first and explain what's wrong before changing code")
 - Fix 5: Multi-turn — if Gemini's first attempt has no file changes, retry once with a more specific prompt asking it to actually produce changes
-- [ ] Voice: improve Gemini agent code quality with better context and prompting
 
 ### P2 — Nice to have
 
 ## Blocked
 
 ## Completed (recent)
+- [x] Fix blog command not persisting — was using task-only commitAndPush, now uses commitAndPushFiles ✅ 2026-03-20
 - [x] Voice: replace hardcoded project list with dynamic discovery (fixes missing recordoc) ✅ 2026-03-20
 - [x] CI: make deploy resilient to nginx config errors ✅ 2026-03-20
 - [x] VPS: issue SSL cert for samantafluture.com + add ACME challenge to nginx config ✅ 2026-03-20
