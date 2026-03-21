@@ -42,6 +42,7 @@ export interface AgentRunResult {
   success: boolean;
   output: string;
   filesChanged: number;
+  changedFiles: string[];
   error?: string;
   usage?: { inputTokens: number; outputTokens: number };
 }

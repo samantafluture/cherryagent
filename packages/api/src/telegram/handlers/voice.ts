@@ -8,6 +8,7 @@ import {
   generateBranchName,
   generatePrTitle,
   runGeminiAgent,
+  ensureCleanMain,
   createBranchAndPush,
   pushExistingBranch,
   createDraftPr,
@@ -335,6 +336,10 @@ export function createVoiceHandlers(deps: VoiceHandlerDeps) {
 
   async function runVoicePipeline(ctx: Context, chatId: string, intent: VoiceIntent) {
     try {
+      // Ensure repo is on main with clean working tree before agent runs
+      await ctx.reply("⏳ Preparing repository…");
+      await ensureCleanMain(intent.repoPath);
+
       await ctx.reply("⏳ Running Gemini agent…");
       const result = await runGeminiAgent({
         gemini,
@@ -369,11 +374,23 @@ export function createVoiceHandlers(deps: VoiceHandlerDeps) {
         return ctx.reply("Agent ran but made no changes.");
       }
 
-      // Create branch, commit, push
+      // Validate: reject if only .claude/ files changed (tasks.md timestamp, etc.)
+      const meaningfulFiles = result.changedFiles.filter(
+        (f) => !f.startsWith(".claude/"),
+      );
+      if (meaningfulFiles.length === 0) {
+        return ctx.reply(
+          "Agent only modified task management files — no code changes produced. " +
+            "Try rephrasing the task with more specific instructions.",
+        );
+      }
+
+      // Create branch, commit, push (passing explicit file list)
       const pushed = await createBranchAndPush({
         repoPath: intent.repoPath,
         branchName: intent.branchName,
         commitMessage: `${intent.prTitle}\n\nVoice transcript: ${intent.transcript}`,
+        changedFiles: result.changedFiles,
       });
 
       if (!pushed) {
@@ -474,6 +491,7 @@ export function createVoiceHandlers(deps: VoiceHandlerDeps) {
       await pushExistingBranch({
         repoPath: session.repoPath,
         commitMessage: `follow-up: ${transcript.slice(0, 72)}`,
+        changedFiles: result.changedFiles,
       });
     }
 

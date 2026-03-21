@@ -2,27 +2,53 @@ import { execFile } from "node:child_process";
 import type { PrResult } from "./types.js";
 
 /**
- * Create a feature branch, stage, commit, and push.
+ * Ensure the repo is on main with a clean working tree.
+ * Stashes any uncommitted changes to prevent them leaking into voice branches.
+ */
+export async function ensureCleanMain(repoPath: string): Promise<void> {
+  // Stash any uncommitted changes (e.g., tasks.md updates from other commands)
+  const status = await git(repoPath, ["status", "--porcelain"]);
+  if (status.trim()) {
+    await git(repoPath, ["stash", "push", "-m", "voice-agent-pre-run"]);
+  }
+
+  // Switch to main and pull latest
+  await git(repoPath, ["checkout", "main"]);
+  try {
+    await git(repoPath, ["pull", "origin", "main"]);
+  } catch {
+    // Pull may fail if offline — continue with local main
+  }
+}
+
+/**
+ * Create a feature branch, stage specific files, commit, and push.
  * Returns true if there were changes to commit.
  */
 export async function createBranchAndPush(opts: {
   repoPath: string;
   branchName: string;
   commitMessage: string;
+  changedFiles?: string[];
 }): Promise<boolean> {
-  const { repoPath, branchName, commitMessage } = opts;
+  const { repoPath, branchName, commitMessage, changedFiles } = opts;
 
-  // Create and switch to feature branch
+  // Create and switch to feature branch (from clean main)
   await git(repoPath, ["checkout", "-b", branchName]);
 
-  // Stage only tracked file changes (not untracked/sensitive files)
-  await git(repoPath, ["add", "-u"]);
+  // Stage only the files the agent changed (supports both new and modified files)
+  if (changedFiles && changedFiles.length > 0) {
+    await git(repoPath, ["add", ...changedFiles]);
+  } else {
+    // Fallback: stage all changes including untracked files (but not ignored)
+    await git(repoPath, ["add", "--all"]);
+  }
 
-  // Check if there are changes to commit
-  const status = await git(repoPath, ["status", "--porcelain"]);
-  if (!status.trim()) {
-    // No changes — switch back to previous branch and delete
-    await git(repoPath, ["checkout", "-"]);
+  // Check if there are staged changes to commit
+  const diff = await git(repoPath, ["diff", "--cached", "--name-only"]);
+  if (!diff.trim()) {
+    // No changes — switch back to main and delete branch
+    await git(repoPath, ["checkout", "main"]);
     await git(repoPath, ["branch", "-D", branchName]);
     return false;
   }
@@ -40,13 +66,18 @@ export async function createBranchAndPush(opts: {
 export async function pushExistingBranch(opts: {
   repoPath: string;
   commitMessage: string;
+  changedFiles?: string[];
 }): Promise<boolean> {
-  const { repoPath, commitMessage } = opts;
+  const { repoPath, commitMessage, changedFiles } = opts;
 
-  await git(repoPath, ["add", "-u"]);
+  if (changedFiles && changedFiles.length > 0) {
+    await git(repoPath, ["add", ...changedFiles]);
+  } else {
+    await git(repoPath, ["add", "--all"]);
+  }
 
-  const status = await git(repoPath, ["status", "--porcelain"]);
-  if (!status.trim()) return false;
+  const diff = await git(repoPath, ["diff", "--cached", "--name-only"]);
+  if (!diff.trim()) return false;
 
   await git(repoPath, ["commit", "-m", commitMessage]);
   await git(repoPath, ["push"]);
