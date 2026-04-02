@@ -107,7 +107,7 @@ async function promoteLocalTasks(
 
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await client.pages.create({ parent: { database_id: dataSourceId }, properties: properties as any });
+      await client.pages.create({ parent: { data_source_id: dataSourceId }, properties: properties as any });
       console.log(`[notion-sync] Promoted local task to Notion: "${task.title}" (${projectName})`);
     } catch (err) {
       console.error(`[notion-sync] Failed to promote task "${task.title}":`, err);

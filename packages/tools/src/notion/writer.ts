@@ -134,7 +134,7 @@ export async function createSubtasksInNotion(
     }
 
     await client.pages.create({
-      parent: { database_id: dataSourceId },
+      parent: { data_source_id: dataSourceId },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       properties: properties as any,
     });
