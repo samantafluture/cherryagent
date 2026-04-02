@@ -10,8 +10,6 @@
     "lint": "eslint src/"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.82.0",
-    "@google/genai": "^1.43.0",
     "@notionhq/client": "^5.16.0"
   }
 }

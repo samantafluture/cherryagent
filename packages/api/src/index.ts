@@ -1,8 +1,7 @@
 import { createServer } from "./server.js";
 import { createBot } from "./telegram/bot.js";
 import { GeminiProvider, GroqWhisperClient } from "@cherryagent/core";
-import { FitbitAuth, getMediaConfig, startMediaCleanup, startWeeklyReport, listProjects, startSyncScheduler, startNotionSyncScheduler, startDelegationPoller } from "@cherryagent/tools";
-import type { NotionTask, DelegationResult } from "@cherryagent/tools";
+import { FitbitAuth, getMediaConfig, startMediaCleanup, startWeeklyReport, listProjects, startSyncScheduler, startNotionSyncScheduler } from "@cherryagent/tools";
 import { execFileSync } from "node:child_process";
 
 const PORT = parseInt(process.env["PORT"] ?? "3000", 10);
@@ -102,46 +101,7 @@ async function main() {
     console.log("[notion-sync] Scheduler started (every 15 minutes)");
   }
 
-  // Delegation poller (requires both Notion API key + Anthropic API key)
-  const anthropicApiKey = process.env["ANTHROPIC_API_KEY"];
-  const sendTelegramHtml = async (html: string) => {
-    await fetch(
-      `https://api.telegram.org/bot${requireEnv("TELEGRAM_BOT_TOKEN")}/sendMessage`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: requireEnv("TELEGRAM_CHAT_ID"),
-          text: html,
-          parse_mode: "HTML",
-        }),
-      },
-    );
-  };
-
-  const delegationCallbacks = {
-    onStart: (task: NotionTask) => {
-      console.log(`[delegate] Starting: ${task.title} (${task.project})`);
-      sendTelegramHtml(`🤖 <b>Delegation started</b>\n<code>${task.title}</code>\nProject: ${task.project}`);
-    },
-    onComplete: (result: DelegationResult) => {
-      const emoji = result.action === "completed" ? "✅" : result.action === "failed" ? "❌" : "⏭";
-      console.log(`[delegate] ${result.action}: ${result.task}`);
-      const prLine = result.prUrl ? `\n🔗 <a href="${result.prUrl}">View PR</a>` : "";
-      sendTelegramHtml(`${emoji} <b>Delegation ${result.action}</b>\n<code>${result.task}</code>\n${result.message.slice(0, 200)}${prLine}`);
-    },
-    onError: (task: NotionTask, error: Error) => {
-      console.error(`[delegate] Error: ${task.title}:`, error.message);
-    },
-  };
-
-  let delegationTimer: ReturnType<typeof setTimeout> | undefined;
-  if (notionApiKey && anthropicApiKey) {
-    delegationTimer = startDelegationPoller(delegationCallbacks);
-    console.log("[delegate] Poller started (every 15 minutes, 1 min offset)");
-  }
-
-  // Start Fastify (health + Fitbit OAuth + GitHub webhook + Notion sync + delegation)
+  // Start Fastify (health + Fitbit OAuth + GitHub webhook + Notion sync)
   const server = await createServer({
     fitbitAuth,
     githubWebhook: webhookSecret
@@ -156,9 +116,6 @@ async function main() {
       : undefined,
     notionSync: notionApiKey
       ? { onError: notionSyncErrorHandler }
-      : undefined,
-    notionDelegate: notionApiKey && anthropicApiKey
-      ? delegationCallbacks
       : undefined,
   });
   await server.listen({ port: PORT, host: HOST });
@@ -208,7 +165,6 @@ async function main() {
     clearInterval(weeklyReportTimer);
     clearInterval(syncTimer);
     if (notionSyncTimer) clearInterval(notionSyncTimer);
-    if (delegationTimer) clearTimeout(delegationTimer);
     await bot.stop();
     await server.close();
     process.exit(0);

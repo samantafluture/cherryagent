@@ -3,8 +3,7 @@ import { healthRoutes } from "./routes/health.js";
 import { fitbitCallbackRoute } from "./routes/fitbit-callback.js";
 import { githubWebhookRoute } from "./routes/github-webhook.js";
 import { notionSyncRoute } from "./routes/notion-sync.js";
-import { notionDelegateRoute } from "./routes/notion-delegate.js";
-import type { FitbitAuth, GitSyncResult, NotionTask, DelegationResult } from "@cherryagent/tools";
+import type { FitbitAuth, GitSyncResult } from "@cherryagent/tools";
 
 interface ServerDeps {
   fitbitAuth?: FitbitAuth;
@@ -15,11 +14,6 @@ interface ServerDeps {
   };
   notionSync?: {
     onError?: (project: string, error: Error) => void;
-  };
-  notionDelegate?: {
-    onStart?: (task: NotionTask) => void;
-    onComplete?: (result: DelegationResult) => void;
-    onError?: (task: NotionTask, error: Error) => void;
   };
 }
 
@@ -42,10 +36,6 @@ export async function createServer(deps?: ServerDeps) {
 
   if (deps?.notionSync) {
     await app.register(notionSyncRoute(deps.notionSync));
-  }
-
-  if (deps?.notionDelegate) {
-    await app.register(notionDelegateRoute(deps.notionDelegate));
   }
 
   return app;
