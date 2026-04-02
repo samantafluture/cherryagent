@@ -52,18 +52,27 @@ export async function pollDelegatedTasks(): Promise<NotionTask[]> {
   );
 }
 
-/** Build prompt for Claude Code from task metadata. */
-function buildPrompt(task: NotionTask): string {
+/** Build prompt for Claude Code from task metadata, using enriched prompt from triage if available. */
+function buildPrompt(task: NotionTask, enrichedPrompt?: string): string {
   const lines: string[] = [];
 
-  lines.push(`Task: ${task.title}`);
-  if (task.type) lines.push(`Type: ${task.type}`);
-  if (task.filePath) lines.push(`Focus on: ${task.filePath}`);
-  lines.push("");
-  lines.push("Instructions:");
-  lines.push("- Read CLAUDE.md first if it exists. Follow existing conventions.");
+  if (enrichedPrompt) {
+    // Use Gemini's enriched prompt as the primary instruction
+    lines.push(enrichedPrompt);
+    lines.push("");
+    lines.push("Additional instructions:");
+  } else {
+    // Fallback: basic prompt from task metadata
+    lines.push(`Task: ${task.title}`);
+    if (task.type) lines.push(`Type: ${task.type}`);
+    if (task.filePath) lines.push(`Focus on: ${task.filePath}`);
+    lines.push("");
+    lines.push("Instructions:");
+    lines.push("- Read CLAUDE.md first if it exists. Follow existing conventions.");
+  }
+
   lines.push("- Do NOT push or create branches. Just make changes and commit locally.");
-  lines.push("- Be focused and efficient. Don't explore the whole codebase — go straight to the relevant files.");
+  lines.push("- Be focused and efficient. Go straight to the relevant files.");
   lines.push("- Keep your response concise — summarize what you changed in 2-3 sentences.");
 
   return lines.join("\n");
@@ -175,10 +184,10 @@ async function cleanupBranch(repoPath: string, branchName: string): Promise<void
   await git(repoPath, ["branch", "-D", branchName]).catch(() => {});
 }
 
-/** Spawn claude -p via stdin to avoid argument length limits. */
+/** Spawn claude -p via stdin with Sonnet model and turn limit. */
 function runClaude(prompt: string, cwd: string): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
-    const proc = spawn("claude", ["-p"], {
+    const proc = spawn("claude", ["-p", "--model", "sonnet", "--max-turns", "25"], {
       cwd,
       env: { ...process.env },
       stdio: ["pipe", "pipe", "pipe"],
@@ -226,9 +235,12 @@ export async function executeDelegatedTask(
     ? mapping.repoPath
     : PROJECTS_BASE;
 
-  // 1. Triage: check if task is small enough for a single session
+  // 1. Triage: check if task is small enough + get enriched prompt
+  let enrichedPrompt = "";
   try {
     const triage = await triageTask(task);
+    enrichedPrompt = triage.enrichedPrompt;
+
     if (!triage.canExecute && triage.subtasks.length > 0) {
       await createSubtasksInNotion(task, triage.subtasks, triage.reason);
 
@@ -286,7 +298,7 @@ export async function executeDelegatedTask(
   }
 
   // 4. Run Claude Code on the feature branch
-  const prompt = buildPrompt(task);
+  const prompt = buildPrompt(task, enrichedPrompt);
   try {
     const { stdout } = await runClaude(prompt, repoPath);
     const output = stdout.trim();

@@ -8,25 +8,39 @@ export interface TriageResult {
   canExecute: boolean;
   reason: string;
   subtasks: string[];
+  enrichedPrompt: string;
 }
 
-const TRIAGE_PROMPT = `You are a task sizing assistant for an AI coding agent (Claude Code).
-Given a software task and project context, determine if it can be completed in a single 10-minute session.
+const TRIAGE_PROMPT = `You are a task planning assistant for an AI coding agent (Claude Code).
+Given a software task and project context, do two things:
 
-Rules:
+1. DECIDE if the task can be completed in a single 20-minute session.
+2. WRITE an enriched prompt that gives Claude Code precise instructions.
+
+Rules for sizing:
 - Tasks that involve modifying 1-3 files with clear scope → CAN execute
 - Tasks that are vague, multi-phase, require research, or touch many files → CANNOT execute
 - Bug fixes, small features, config changes, documentation updates → usually CAN execute
 - "Build entire feature", "refactor system", "generate content for multiple pages" → CANNOT execute
 - Use the project context (file structure, stack, architecture docs) to make an informed decision
-- When decomposing, each subtask should be completable in one 10-minute session
-- Each subtask should reference specific files or directories when possible
+
+Rules for the enriched prompt:
+- Be specific: name exact files to create/modify, directories to work in
+- Reference patterns from CLAUDE.md or existing code when relevant
+- Include acceptance criteria (what "done" looks like)
+- Keep it under 500 words — Claude Code reads the codebase itself
+
+Rules for subtasks (only when canExecute is false):
+- Each subtask should be completable in one 20-minute session
+- Each subtask should reference specific files or directories
+- 3-5 subtasks maximum
 
 Respond in JSON format only:
 {
   "canExecute": true/false,
   "reason": "one-line explanation",
-  "subtasks": ["subtask 1", "subtask 2", ...] // only if canExecute is false, 3-5 concrete subtasks
+  "enrichedPrompt": "detailed prompt for Claude Code with specific file paths and acceptance criteria",
+  "subtasks": ["subtask 1", "subtask 2", ...] // only if canExecute is false
 }`;
 
 /**
@@ -119,7 +133,7 @@ async function gatherProjectContext(repoPath: string): Promise<string> {
 export async function triageTask(task: NotionTask): Promise<TriageResult> {
   const apiKey = process.env["GEMINI_API_KEY"];
   if (!apiKey) {
-    return { canExecute: true, reason: "Triage skipped (no GEMINI_API_KEY)", subtasks: [] };
+    return { canExecute: true, reason: "Triage skipped (no GEMINI_API_KEY)", enrichedPrompt: "", subtasks: [] };
   }
 
   // Gather project context if we have a repo mapping
@@ -156,7 +170,7 @@ export async function triageTask(task: NotionTask): Promise<TriageResult> {
       contents: fullPrompt,
       config: {
         temperature: 0.1,
-        maxOutputTokens: 500,
+        maxOutputTokens: 1500,
         responseMimeType: "application/json",
       },
     });
@@ -184,11 +198,12 @@ export async function triageTask(task: NotionTask): Promise<TriageResult> {
     return {
       canExecute: Boolean(parsed.canExecute),
       reason: String(parsed.reason ?? ""),
+      enrichedPrompt: String(parsed.enrichedPrompt ?? ""),
       subtasks: Array.isArray(parsed.subtasks) ? parsed.subtasks.map(String) : [],
     };
   } catch (err) {
-    // On any triage failure, default to attempting execution
+    // On any triage failure, default to attempting execution with no enrichment
     console.error("[triage] Gemini triage failed, allowing execution:", err);
-    return { canExecute: true, reason: "Triage failed, attempting execution", subtasks: [] };
+    return { canExecute: true, reason: "Triage failed, attempting execution", enrichedPrompt: "", subtasks: [] };
   }
 }
