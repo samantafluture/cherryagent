@@ -85,7 +85,7 @@ export async function markTaskDone(
   }
 }
 
-/** Revert task on failure: status back to Not started, clear delegate, post error. */
+/** Mark task as Done with failure info. Keeps it in history instead of reverting. */
 export async function markTaskFailed(
   pageId: string,
   error: string,
@@ -95,9 +95,9 @@ export async function markTaskFailed(
   await client.pages.update({
     page_id: pageId,
     properties: {
-      Status: { status: { name: "Not started" } },
+      Status: { status: { name: "Done" } },
       Result: {
-        rich_text: [{ text: { content: `Error: ${error.slice(0, 1990)}` } }],
+        rich_text: [{ text: { content: `FAILED: ${error.slice(0, 1985)}` } }],
       },
       "Delegate to Claude Code": { checkbox: false },
     },

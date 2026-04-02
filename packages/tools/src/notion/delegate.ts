@@ -74,31 +74,18 @@ function extractSummary(output: string): string {
   return summary.slice(0, 200);
 }
 
+const PROJECTS_BASE = process.env["PROJECTS_BASE"] ?? "/home/sam/apps";
+
 /** Execute a single delegated task end-to-end. */
 export async function executeDelegatedTask(
   task: NotionTask,
   opts?: DelegationPollerOpts,
 ): Promise<DelegationResult> {
   const mapping = getProjectMapping(task.project);
-  if (!mapping) {
-    return {
-      pageId: task.pageId,
-      task: task.title,
-      project: task.project,
-      action: "skipped",
-      message: `No repo mapping for project: ${task.project}`,
-    };
-  }
-
-  if (!existsSync(mapping.repoPath)) {
-    return {
-      pageId: task.pageId,
-      task: task.title,
-      project: task.project,
-      action: "skipped",
-      message: `Repo path does not exist: ${mapping.repoPath}`,
-    };
-  }
+  // Fall back to PROJECTS_BASE for tasks without a project or with unmapped projects
+  const repoPath = mapping?.repoPath && existsSync(mapping.repoPath)
+    ? mapping.repoPath
+    : PROJECTS_BASE;
 
   // 1. Triage: check if task is small enough for a single session
   try {
@@ -146,7 +133,7 @@ export async function executeDelegatedTask(
   const prompt = buildPrompt(task);
   try {
     const { stdout } = await execFileAsync("claude", ["-p", prompt], {
-      cwd: mapping.repoPath,
+      cwd: repoPath,
       timeout: CLAUDE_TIMEOUT_MS,
       maxBuffer: MAX_OUTPUT_BYTES,
       env: { ...process.env },
