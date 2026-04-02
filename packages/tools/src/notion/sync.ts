@@ -12,9 +12,12 @@ import {
   queryAllRecentlyCompleted,
   type NotionTask,
 } from "./client.js";
+import { getClient } from "./client.js";
 import { renderTasksMarkdown } from "./renderer.js";
 import { getAllProjectMappings, getProjectMapping } from "./config.js";
 import { commitAndPushFiles } from "../tasks/git-sync.js";
+import { parseTaskFile } from "../tasks/parser.js";
+import type { Task } from "../tasks/types.js";
 
 export interface SyncResult {
   project: string;
@@ -35,6 +38,83 @@ const QUIET_HOURS_END = 6;
 function isDuringQuietHours(): boolean {
   const hour = new Date().getHours();
   return hour >= QUIET_HOURS_START && hour < QUIET_HOURS_END;
+}
+
+/**
+ * Promote tasks found in tasks.md that don't exist in Notion.
+ * This handles the case where Claude Code agents add tasks via /cherrytasks.
+ * Matching is by normalized title (lowercase, trimmed).
+ */
+async function promoteLocalTasks(
+  projectName: string,
+  repoPath: string,
+  notionTasks: NotionTask[],
+): Promise<number> {
+  const taskFilePath = join(repoPath, TASK_FILE_REL);
+  const existing = await readFile(taskFilePath, "utf-8").catch(() => "");
+  if (!existing || !existing.includes("# Project:")) return 0;
+
+  // Parse the local tasks.md
+  const localFile = parseTaskFile(existing);
+  const localTasks: Task[] = [
+    ...localFile.sections.activeP0.tasks,
+    ...localFile.sections.activeP1.tasks,
+    ...localFile.sections.activeP2.tasks,
+    ...localFile.sections.blocked.tasks,
+  ].filter((t) => !t.checkbox); // only active tasks
+
+  if (localTasks.length === 0) return 0;
+
+  // Build a set of normalized Notion task titles for matching
+  const notionTitles = new Set(
+    notionTasks.map((t) => t.title.toLowerCase().trim()),
+  );
+
+  // Find tasks in tasks.md that aren't in Notion
+  const newTasks = localTasks.filter(
+    (t) => !notionTitles.has(t.title.toLowerCase().trim()),
+  );
+
+  if (newTasks.length === 0) return 0;
+
+  // Create them in Notion
+  const client = getClient();
+  const dataSourceId = process.env["NOTION_DATA_SOURCE_ID"];
+  if (!dataSourceId) return 0;
+
+  const priorityMap: Record<string, string> = {
+    P0: "P0 Critical",
+    P1: "P1 High",
+    P2: "P2 Medium",
+  };
+
+  for (const task of newTasks) {
+    const properties: Record<string, unknown> = {
+      Task: { title: [{ text: { content: task.title } }] },
+      Status: { status: { name: task.status === "wip" ? "In progress" : "Not started" } },
+      Project: { select: { name: projectName } },
+      Priority: { select: { name: priorityMap[task.priority] ?? "P2 Medium" } },
+      Owner: { select: { name: "Claude Code" } },
+    };
+
+    // Map tags to Type if we recognize one
+    const typeTag = task.tags.find((t) =>
+      ["feature", "bug", "chore", "research", "infra", "content", "design"].includes(t),
+    );
+    if (typeTag) {
+      properties["Type"] = { select: { name: typeTag.charAt(0).toUpperCase() + typeTag.slice(1) } };
+    }
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await client.pages.create({ parent: { database_id: dataSourceId }, properties: properties as any });
+      console.log(`[notion-sync] Promoted local task to Notion: "${task.title}" (${projectName})`);
+    } catch (err) {
+      console.error(`[notion-sync] Failed to promote task "${task.title}":`, err);
+    }
+  }
+
+  return newTasks.length;
 }
 
 /** Sync a single project from Notion to its repo's tasks.md. */
@@ -104,8 +184,15 @@ export async function syncAllProjects(): Promise<SyncResult[]> {
       continue;
     }
 
-    const activeTasks = activeByProject.get(projectName) ?? [];
+    let activeTasks = activeByProject.get(projectName) ?? [];
     const completedTasks = completedByProject.get(projectName) ?? [];
+
+    // Reverse sync: promote local tasks.md tasks to Notion before overwriting
+    const promoted = await promoteLocalTasks(projectName, mapping.repoPath, activeTasks).catch(() => 0);
+    if (promoted > 0) {
+      // Re-query Notion to include the newly promoted tasks
+      activeTasks = await queryTasksByProject(projectName);
+    }
 
     const markdown = renderTasksMarkdown(projectName, activeTasks, completedTasks);
     const taskFilePath = join(mapping.repoPath, TASK_FILE_REL);
