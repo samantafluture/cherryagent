@@ -150,7 +150,7 @@ export {
 } from "./media/yt-favorites.js";
 
 // Notion
-export type { NotionTask, NotionProjectMapping, SyncResult, NotionSyncSchedulerOpts } from "./notion/index.js";
+export type { NotionTask, NotionProjectMapping, SyncResult, NotionSyncSchedulerOpts, DelegationResult, DelegationPollerOpts } from "./notion/index.js";
 export {
   queryTasksByProject,
   queryRecentlyCompleted,
@@ -163,4 +163,14 @@ export {
   syncProject,
   syncAllProjects,
   startNotionSyncScheduler,
+  updateNotionTaskStatus,
+  updateNotionTaskResult,
+  clearDelegateCheckbox,
+  addNotionComment,
+  markTaskDone,
+  markTaskFailed,
+  pollDelegatedTasks,
+  executeDelegatedTask,
+  processDelegatedTasks,
+  startDelegationPoller,
 } from "./notion/index.js";

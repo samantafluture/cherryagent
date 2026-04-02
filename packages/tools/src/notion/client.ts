@@ -23,7 +23,7 @@ export interface NotionTask {
 
 let clientInstance: Client | null = null;
 
-function getClient(): Client {
+export function getClient(): Client {
   if (!clientInstance) {
     const auth = process.env["NOTION_API_KEY"];
     if (!auth) throw new Error("NOTION_API_KEY env var is required");

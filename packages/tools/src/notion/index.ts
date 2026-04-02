@@ -13,3 +13,20 @@ export { buildTaskFile, renderTasksMarkdown } from "./renderer.js";
 
 export type { SyncResult, NotionSyncSchedulerOpts } from "./sync.js";
 export { syncProject, syncAllProjects, startNotionSyncScheduler } from "./sync.js";
+
+export {
+  updateNotionTaskStatus,
+  updateNotionTaskResult,
+  clearDelegateCheckbox,
+  addNotionComment,
+  markTaskDone,
+  markTaskFailed,
+} from "./writer.js";
+
+export type { DelegationResult, DelegationPollerOpts } from "./delegate.js";
+export {
+  pollDelegatedTasks,
+  executeDelegatedTask,
+  processDelegatedTasks,
+  startDelegationPoller,
+} from "./delegate.js";

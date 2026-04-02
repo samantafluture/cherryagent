@@ -69,6 +69,9 @@ RUN git config --system safe.directory '*' \
   && git config --system user.email "cherryagent@samantafluture.com" \
   && git config --system user.name "CherryAgent"
 
+# Install Claude Code CLI for task delegation
+RUN npm install -g @anthropic-ai/claude-code
+
 USER node
 
 EXPOSE 3000
