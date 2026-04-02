@@ -19,7 +19,6 @@ const RAW_MAP: Record<string, string> = {
   "CherryOps": "cherryops",
   "saminprogress": "saminprogress",
   "samantafluture.com": "samantafluture-site",
-  "CherryTree": "cherrytree",
   "FinCherry": "fincherry",
   "Recordoc": "recordoc",
 };

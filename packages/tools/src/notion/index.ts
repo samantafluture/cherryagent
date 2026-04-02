@@ -21,7 +21,11 @@ export {
   addNotionComment,
   markTaskDone,
   markTaskFailed,
+  createSubtasksInNotion,
 } from "./writer.js";
+
+export type { TriageResult } from "./triage.js";
+export { triageTask } from "./triage.js";
 
 export type { DelegationResult, DelegationPollerOpts } from "./delegate.js";
 export {

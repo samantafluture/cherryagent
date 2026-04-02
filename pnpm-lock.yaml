@@ -50,6 +50,9 @@ importers:
 
   packages/tools:
     dependencies:
+      '@google/genai':
+        specifier: ^1.43.0
+        version: 1.43.0
       '@notionhq/client':
         specifier: ^5.16.0
         version: 5.16.0

@@ -7,7 +7,9 @@ import {
   updateNotionTaskStatus,
   markTaskDone,
   markTaskFailed,
+  createSubtasksInNotion,
 } from "./writer.js";
+import { triageTask } from "./triage.js";
 import { syncProject } from "./sync.js";
 
 const execFileAsync = promisify(execFile);
@@ -98,7 +100,33 @@ export async function executeDelegatedTask(
     };
   }
 
-  // 1. Mark as in progress
+  // 1. Triage: check if task is small enough for a single session
+  try {
+    const triage = await triageTask(task);
+    if (!triage.canExecute && triage.subtasks.length > 0) {
+      await createSubtasksInNotion(task, triage.subtasks, triage.reason);
+
+      try {
+        await syncProject(task.project);
+      } catch {
+        // Non-fatal
+      }
+
+      const result: DelegationResult = {
+        pageId: task.pageId,
+        task: task.title,
+        project: task.project,
+        action: "completed",
+        message: `Decomposed into ${triage.subtasks.length} subtasks: ${triage.reason}`,
+      };
+      opts?.onComplete?.(result);
+      return result;
+    }
+  } catch {
+    // Triage failed — proceed with execution anyway
+  }
+
+  // 2. Mark as in progress
   try {
     await updateNotionTaskStatus(task.pageId, "In progress");
   } catch (err) {
@@ -114,7 +142,7 @@ export async function executeDelegatedTask(
 
   opts?.onStart?.(task);
 
-  // 2. Spawn Claude Code
+  // 3. Spawn Claude Code
   const prompt = buildPrompt(task);
   try {
     const { stdout } = await execFileAsync("claude", ["-p", prompt], {

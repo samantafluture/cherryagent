@@ -1,4 +1,4 @@
-import { getClient } from "./client.js";
+import { getClient, type NotionTask } from "./client.js";
 
 const COMMENT_MAX_LENGTH = 2000;
 
@@ -104,4 +104,56 @@ export async function markTaskFailed(
   });
 
   await addNotionComment(pageId, `Delegation failed:\n${error}`);
+}
+
+/**
+ * Create subtasks in Notion for a task that's too large.
+ * Copies the parent's Project, Priority (downgraded to P1), and Owner.
+ * Marks the parent as "Done" with a note about decomposition.
+ */
+export async function createSubtasksInNotion(
+  parentTask: NotionTask,
+  subtaskTitles: string[],
+  reason: string,
+): Promise<void> {
+  const client = getClient();
+  const dataSourceId = process.env["NOTION_DATA_SOURCE_ID"];
+  if (!dataSourceId) throw new Error("NOTION_DATA_SOURCE_ID env var is required");
+
+  // Create each subtask as a new page in the database
+  for (const title of subtaskTitles) {
+    const properties: Record<string, unknown> = {
+      Task: { title: [{ text: { content: title } }] },
+      Status: { status: { name: "Not started" } },
+      Priority: { select: { name: "P1 High" } },
+      Owner: { select: { name: "Claude Code" } },
+      "Delegate to Claude Code": { checkbox: true },
+    };
+    if (parentTask.project) {
+      properties["Project"] = { select: { name: parentTask.project } };
+    }
+
+    await client.pages.create({
+      parent: { database_id: dataSourceId },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      properties: properties as any,
+    });
+  }
+
+  // Mark parent task as done with decomposition note
+  await client.pages.update({
+    page_id: parentTask.pageId,
+    properties: {
+      Status: { status: { name: "Done" } },
+      Result: {
+        rich_text: [{ text: { content: `Decomposed into ${subtaskTitles.length} subtasks: ${reason}` } }],
+      },
+      "Delegate to Claude Code": { checkbox: false },
+    },
+  });
+
+  await addNotionComment(
+    parentTask.pageId,
+    `Task too large for single session. Created ${subtaskTitles.length} subtasks:\n${subtaskTitles.map((t, i) => `${i + 1}. ${t}`).join("\n")}`,
+  );
 }
