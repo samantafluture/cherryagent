@@ -127,7 +127,8 @@ async function main() {
     onComplete: (result: DelegationResult) => {
       const emoji = result.action === "completed" ? "✅" : result.action === "failed" ? "❌" : "⏭";
       console.log(`[delegate] ${result.action}: ${result.task}`);
-      sendTelegramHtml(`${emoji} <b>Delegation ${result.action}</b>\n<code>${result.task}</code>\n${result.message.slice(0, 200)}`);
+      const prLine = result.prUrl ? `\n🔗 <a href="${result.prUrl}">View PR</a>` : "";
+      sendTelegramHtml(`${emoji} <b>Delegation ${result.action}</b>\n<code>${result.task}</code>\n${result.message.slice(0, 200)}${prLine}`);
     },
     onError: (task: NotionTask, error: Error) => {
       console.error(`[delegate] Error: ${task.title}:`, error.message);
