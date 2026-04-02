@@ -60,9 +60,11 @@ function buildPrompt(task: NotionTask): string {
   if (task.type) lines.push(`Type: ${task.type}`);
   if (task.filePath) lines.push(`Focus on: ${task.filePath}`);
   lines.push("");
-  lines.push("Read CLAUDE.md first. Follow existing conventions.");
-  lines.push("Commit your changes with a descriptive message.");
-  lines.push("Keep your response concise — summarize what you did.");
+  lines.push("Instructions:");
+  lines.push("- Read CLAUDE.md first if it exists. Follow existing conventions.");
+  lines.push("- Do NOT push or create branches. Just make changes and commit locally.");
+  lines.push("- Be focused and efficient. Don't explore the whole codebase — go straight to the relevant files.");
+  lines.push("- Keep your response concise — summarize what you changed in 2-3 sentences.");
 
   return lines.join("\n");
 }

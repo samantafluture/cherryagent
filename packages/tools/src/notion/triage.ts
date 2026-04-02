@@ -162,15 +162,24 @@ export async function triageTask(task: NotionTask): Promise<TriageResult> {
     });
 
     const text = response.text?.trim() ?? "";
-    // Gemini sometimes wraps in markdown code blocks or uses thinking tags
-    const cleaned = text
-      .replace(/^```json\s*/i, "")
-      .replace(/```\s*$/, "")
-      .replace(/^[\s\S]*?(\{)/m, "$1") // strip everything before first {
-      .replace(/\}[\s\S]*$/, "}") // strip everything after last }
-      .trim();
-    console.log("[triage] Gemini response:", cleaned.slice(0, 200));
-    const parsed = JSON.parse(cleaned) as TriageResult;
+    console.log("[triage] Gemini raw response:", text.slice(0, 300));
+
+    // Try parsing directly first (responseMimeType should give clean JSON)
+    let parsed: TriageResult;
+    try {
+      parsed = JSON.parse(text) as TriageResult;
+    } catch {
+      // Fallback: clean up common Gemini quirks
+      const cleaned = text
+        .replace(/^```json\s*/i, "")
+        .replace(/```\s*$/, "")
+        .replace(/^[\s\S]*?(\{)/m, "$1")
+        .replace(/\}[\s\S]*$/, "}")
+        .replace(/'/g, '"') // single quotes → double quotes
+        .replace(/(\w+):/g, '"$1":') // unquoted keys → quoted
+        .trim();
+      parsed = JSON.parse(cleaned) as TriageResult;
+    }
 
     return {
       canExecute: Boolean(parsed.canExecute),

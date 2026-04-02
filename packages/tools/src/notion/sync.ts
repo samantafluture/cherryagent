@@ -1,6 +1,10 @@
 import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { existsSync } from "node:fs";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(execFile);
 import {
   queryTasksByProject,
   queryRecentlyCompleted,
@@ -58,6 +62,11 @@ export async function syncProject(projectName: string): Promise<SyncResult> {
     return { project: projectName, action: "skipped", message: "No task changes" };
   }
 
+  // Skip if repo is on a feature branch (delegation in progress)
+  if (!await isOnDefaultBranch(mapping.repoPath)) {
+    return { project: projectName, action: "skipped", message: "Repo is on a feature branch — skipping sync" };
+  }
+
   // Write the file
   await mkdir(dirname(taskFilePath), { recursive: true });
   await writeFile(taskFilePath, markdown, "utf-8");
@@ -86,6 +95,12 @@ export async function syncAllProjects(): Promise<SyncResult[]> {
   for (const [projectName, mapping] of mappings) {
     if (!existsSync(mapping.repoPath)) {
       results.push({ project: projectName, action: "no-repo", message: `Repo path does not exist: ${mapping.repoPath}` });
+      continue;
+    }
+
+    // Skip if repo is on a feature branch (delegation in progress)
+    if (!await isOnDefaultBranch(mapping.repoPath)) {
+      results.push({ project: projectName, action: "skipped", message: "Repo on feature branch — skipping" });
       continue;
     }
 
@@ -157,6 +172,20 @@ function groupByProject(tasks: NotionTask[]): Map<string, NotionTask[]> {
     map.set(task.project, list);
   }
   return map;
+}
+
+/** Check if a repo is on main or master (safe to push to). */
+async function isOnDefaultBranch(repoPath: string): Promise<boolean> {
+  try {
+    const { stdout } = await execFileAsync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
+      cwd: repoPath,
+      timeout: 5000,
+    });
+    const branch = stdout.trim();
+    return branch === "main" || branch === "master";
+  } catch {
+    return false;
+  }
 }
 
 /** Strip the sync timestamp comment lines so we can compare actual task content. */
