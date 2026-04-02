@@ -128,10 +128,16 @@ export async function syncProject(projectName: string): Promise<SyncResult> {
     return { project: projectName, action: "no-repo", message: `Repo path does not exist: ${mapping.repoPath}` };
   }
 
-  const [activeTasks, completedTasks] = await Promise.all([
+  let [activeTasks, completedTasks] = await Promise.all([
     queryTasksByProject(projectName),
     queryRecentlyCompleted(projectName),
   ]);
+
+  // Reverse sync: promote local tasks.md tasks to Notion before overwriting
+  const promoted = await promoteLocalTasks(projectName, mapping.repoPath, activeTasks).catch(() => 0);
+  if (promoted > 0) {
+    activeTasks = await queryTasksByProject(projectName);
+  }
 
   const markdown = renderTasksMarkdown(projectName, activeTasks, completedTasks);
   const taskFilePath = join(mapping.repoPath, TASK_FILE_REL);
