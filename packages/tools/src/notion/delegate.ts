@@ -1,5 +1,4 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
+import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { type NotionTask, queryAllActiveTasks } from "./client.js";
 import { getProjectMapping } from "./config.js";
@@ -12,10 +11,7 @@ import {
 import { triageTask } from "./triage.js";
 import { syncProject } from "./sync.js";
 
-const execFileAsync = promisify(execFile);
-
 const CLAUDE_TIMEOUT_MS = 600_000; // 10 minutes
-const MAX_OUTPUT_BYTES = 1024 * 1024; // 1MB
 const POLL_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
 const POLL_OFFSET_MS = 60 * 1000; // 1 minute offset from sync scheduler
 const QUIET_HOURS_START = 0;
@@ -74,6 +70,46 @@ function extractSummary(output: string): string {
   return summary.slice(0, 200);
 }
 
+/** Spawn claude -p via stdin to avoid argument length limits. */
+function runClaude(prompt: string, cwd: string): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    const proc = spawn("claude", ["-p"], {
+      cwd,
+      env: { ...process.env },
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    let stdout = "";
+    let stderr = "";
+
+    proc.stdout.on("data", (chunk: Buffer) => { stdout += chunk.toString(); });
+    proc.stderr.on("data", (chunk: Buffer) => { stderr += chunk.toString(); });
+
+    const timer = setTimeout(() => {
+      proc.kill("SIGTERM");
+      reject(new Error(`Claude Code timed out after ${CLAUDE_TIMEOUT_MS / 1000}s`));
+    }, CLAUDE_TIMEOUT_MS);
+
+    proc.on("close", (code) => {
+      clearTimeout(timer);
+      if (code === 0) {
+        resolve({ stdout, stderr });
+      } else {
+        reject(new Error(stderr || `Claude Code exited with code ${code}`));
+      }
+    });
+
+    proc.on("error", (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+
+    // Write prompt to stdin and close
+    proc.stdin.write(prompt);
+    proc.stdin.end();
+  });
+}
+
 const PROJECTS_BASE = process.env["PROJECTS_BASE"] ?? "/home/sam/apps";
 
 /** Execute a single delegated task end-to-end. */
@@ -129,15 +165,10 @@ export async function executeDelegatedTask(
 
   opts?.onStart?.(task);
 
-  // 3. Spawn Claude Code
+  // 3. Spawn Claude Code (pipe prompt via stdin to avoid arg length limits)
   const prompt = buildPrompt(task);
   try {
-    const { stdout } = await execFileAsync("claude", ["-p", prompt], {
-      cwd: repoPath,
-      timeout: CLAUDE_TIMEOUT_MS,
-      maxBuffer: MAX_OUTPUT_BYTES,
-      env: { ...process.env },
-    });
+    const { stdout } = await runClaude(prompt, repoPath);
 
     const output = stdout.trim();
     const summary = extractSummary(output);

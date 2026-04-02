@@ -162,11 +162,14 @@ export async function triageTask(task: NotionTask): Promise<TriageResult> {
     });
 
     const text = response.text?.trim() ?? "";
-    // Gemini sometimes wraps in markdown code blocks
+    // Gemini sometimes wraps in markdown code blocks or uses thinking tags
     const cleaned = text
       .replace(/^```json\s*/i, "")
       .replace(/```\s*$/, "")
+      .replace(/^[\s\S]*?(\{)/m, "$1") // strip everything before first {
+      .replace(/\}[\s\S]*$/, "}") // strip everything after last }
       .trim();
+    console.log("[triage] Gemini response:", cleaned.slice(0, 200));
     const parsed = JSON.parse(cleaned) as TriageResult;
 
     return {
