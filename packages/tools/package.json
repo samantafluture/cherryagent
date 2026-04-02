@@ -8,5 +8,8 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/"
+  },
+  "dependencies": {
+    "@notionhq/client": "^5.16.0"
   }
 }

@@ -48,7 +48,11 @@ importers:
         specifier: ^1.43.0
         version: 1.43.0
 
-  packages/tools: {}
+  packages/tools:
+    dependencies:
+      '@notionhq/client':
+        specifier: ^5.16.0
+        version: 5.16.0
 
 packages:
 
@@ -287,6 +291,10 @@ packages:
   '@isaacs/cliui@8.0.2':
     resolution: {integrity: sha512-O8jcjabXaleOG9DQ0+ARXWZBTfnP4WNAqzuiJK7ll44AmxGKv/J2M4TPjxjY3znBCfvBXFzucm1twdyFybFqEA==}
     engines: {node: '>=12'}
+
+  '@notionhq/client@5.16.0':
+    resolution: {integrity: sha512-0mxHJNQBLbcG2Y4+oM+XNySr/3zKtK7FKjWhrUo8TB3WCdwtUMhvuooNmEjOo8NLL9qmKm7cCR4GtEsuTD+SNg==}
+    engines: {node: '>=18'}
 
   '@pinojs/redact@0.4.0':
     resolution: {integrity: sha512-k2ENnmBugE/rzQfEcdWHcCY+/FM3VLzH9cYEsbdsoqrvzAKRhUZeRNhAZvB8OitQJ1TBed3yqWtdjzS6wJKBwg==}
@@ -1219,6 +1227,8 @@ snapshots:
       strip-ansi-cjs: strip-ansi@6.0.1
       wrap-ansi: 8.1.0
       wrap-ansi-cjs: wrap-ansi@7.0.0
+
+  '@notionhq/client@5.16.0': {}
 
   '@pinojs/redact@0.4.0': {}
 

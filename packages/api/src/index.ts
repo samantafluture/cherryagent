@@ -1,7 +1,7 @@
 import { createServer } from "./server.js";
 import { createBot } from "./telegram/bot.js";
 import { GeminiProvider, GroqWhisperClient } from "@cherryagent/core";
-import { FitbitAuth, getMediaConfig, startMediaCleanup, startWeeklyReport, listProjects, startSyncScheduler } from "@cherryagent/tools";
+import { FitbitAuth, getMediaConfig, startMediaCleanup, startWeeklyReport, listProjects, startSyncScheduler, startNotionSyncScheduler } from "@cherryagent/tools";
 import { execFileSync } from "node:child_process";
 
 const PORT = parseInt(process.env["PORT"] ?? "3000", 10);
@@ -86,7 +86,22 @@ async function main() {
     }
   }
 
-  // Start Fastify (health + Fitbit OAuth + GitHub webhook)
+  // Notion sync (cron + webhook route)
+  const notionApiKey = process.env["NOTION_API_KEY"];
+  const notionSyncErrorHandler = (project: string, error: Error) => {
+    console.error(`[notion-sync] Error syncing ${project}:`, error.message);
+    sendConflictNotification(project, `Notion sync failed: ${error.message}`);
+  };
+
+  let notionSyncTimer: ReturnType<typeof setInterval> | undefined;
+  if (notionApiKey) {
+    notionSyncTimer = startNotionSyncScheduler({
+      onError: notionSyncErrorHandler,
+    });
+    console.log("[notion-sync] Scheduler started (every 6 hours)");
+  }
+
+  // Start Fastify (health + Fitbit OAuth + GitHub webhook + Notion sync)
   const server = await createServer({
     fitbitAuth,
     githubWebhook: webhookSecret
@@ -98,6 +113,9 @@ async function main() {
             sendConflictNotification(repoPath, result.message);
           },
         }
+      : undefined,
+    notionSync: notionApiKey
+      ? { onError: notionSyncErrorHandler }
       : undefined,
   });
   await server.listen({ port: PORT, host: HOST });
@@ -146,6 +164,7 @@ async function main() {
     clearInterval(cleanupTimer);
     clearInterval(weeklyReportTimer);
     clearInterval(syncTimer);
+    if (notionSyncTimer) clearInterval(notionSyncTimer);
     await bot.stop();
     await server.close();
     process.exit(0);
