@@ -24,7 +24,7 @@ export interface NotionSyncSchedulerOpts {
 }
 
 const TASK_FILE_REL = ".claude/tasks.md";
-const DEFAULT_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
+const DEFAULT_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
 const QUIET_HOURS_START = 0;
 const QUIET_HOURS_END = 6;
 
