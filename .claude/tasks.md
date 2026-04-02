@@ -14,6 +14,7 @@
 ### P1 — Should do this week
 
 ### P2 — Nice to have
+- [ ] Test reverse sync from tasks.md to Notion #chore
 
 ## Blocked
 
