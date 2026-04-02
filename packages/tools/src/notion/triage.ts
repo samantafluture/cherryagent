@@ -172,25 +172,27 @@ export async function triageTask(task: NotionTask): Promise<TriageResult> {
         temperature: 0.1,
         maxOutputTokens: 1500,
         responseMimeType: "application/json",
+        thinkingConfig: { thinkingBudget: 0 }, // disable thinking for clean JSON output
       },
     });
 
     const text = response.text?.trim() ?? "";
     console.log("[triage] Gemini raw response:", text.slice(0, 300));
 
-    // Try parsing directly first (responseMimeType should give clean JSON)
+    // Fix literal newlines inside JSON string values (Gemini's main quirk)
+    const sanitized = text.replace(/(?<="[^"]*)\n(?=[^"]*")/g, " ");
+
     let parsed: TriageResult;
     try {
-      parsed = JSON.parse(text) as TriageResult;
+      parsed = JSON.parse(sanitized) as TriageResult;
     } catch {
-      // Fallback: clean up common Gemini quirks
-      const cleaned = text
+      // Fallback: more aggressive cleanup
+      const cleaned = sanitized
         .replace(/^```json\s*/i, "")
         .replace(/```\s*$/, "")
         .replace(/^[\s\S]*?(\{)/m, "$1")
         .replace(/\}[\s\S]*$/, "}")
-        .replace(/'/g, '"') // single quotes → double quotes
-        .replace(/(\w+):/g, '"$1":') // unquoted keys → quoted
+        .replace(/\n/g, " ") // nuke all remaining newlines
         .trim();
       parsed = JSON.parse(cleaned) as TriageResult;
     }
