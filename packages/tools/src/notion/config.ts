@@ -21,6 +21,7 @@ const RAW_MAP: Record<string, string> = {
   "samantafluture.com": "samantafluture-site",
   "FinCherry": "fincherry",
   "Recordoc": "recordoc",
+  "CherryKit": "cherrykit",
 };
 
 export function getProjectMapping(notionProject: string): NotionProjectMapping | undefined {
