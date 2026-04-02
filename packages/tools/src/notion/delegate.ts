@@ -1,4 +1,3 @@
-import { spawn } from "node:child_process";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { existsSync } from "node:fs";
@@ -12,11 +11,11 @@ import {
 } from "./writer.js";
 import { triageTask } from "./triage.js";
 import { syncProject } from "./sync.js";
+import { runAgent } from "./agent.js";
 
 const execFileAsync = promisify(execFile);
 const GIT_TIMEOUT = 30_000;
 
-const CLAUDE_TIMEOUT_MS = 20 * 60 * 1000; // 20 minutes
 const POLL_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
 const POLL_OFFSET_MS = 60 * 1000; // 1 minute offset from sync scheduler
 const QUIET_HOURS_START = 0;
@@ -184,45 +183,6 @@ async function cleanupBranch(repoPath: string, branchName: string): Promise<void
   await git(repoPath, ["branch", "-D", branchName]).catch(() => {});
 }
 
-/** Spawn claude -p via stdin with Sonnet model and turn limit. */
-function runClaude(prompt: string, cwd: string): Promise<{ stdout: string; stderr: string }> {
-  return new Promise((resolve, reject) => {
-    const proc = spawn("claude", ["-p", "--model", "sonnet", "--max-turns", "25"], {
-      cwd,
-      env: { ...process.env },
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-
-    let stdout = "";
-    let stderr = "";
-
-    proc.stdout.on("data", (chunk: Buffer) => { stdout += chunk.toString(); });
-    proc.stderr.on("data", (chunk: Buffer) => { stderr += chunk.toString(); });
-
-    const timer = setTimeout(() => {
-      proc.kill("SIGTERM");
-      reject(new Error(`Claude Code timed out after ${CLAUDE_TIMEOUT_MS / 1000}s`));
-    }, CLAUDE_TIMEOUT_MS);
-
-    proc.on("close", (code) => {
-      clearTimeout(timer);
-      if (code === 0) {
-        resolve({ stdout, stderr });
-      } else {
-        reject(new Error(stderr || `Claude Code exited with code ${code}`));
-      }
-    });
-
-    proc.on("error", (err) => {
-      clearTimeout(timer);
-      reject(err);
-    });
-
-    proc.stdin.write(prompt);
-    proc.stdin.end();
-  });
-}
-
 const PROJECTS_BASE = process.env["PROJECTS_BASE"] ?? "/home/sam/apps";
 
 /** Execute a single delegated task end-to-end. */
@@ -297,11 +257,11 @@ export async function executeDelegatedTask(
     };
   }
 
-  // 4. Run Claude Code on the feature branch
+  // 4. Run agent on the feature branch
   const prompt = buildPrompt(task, enrichedPrompt);
   try {
-    const { stdout } = await runClaude(prompt, repoPath);
-    const output = stdout.trim();
+    const { output: rawOutput } = await runAgent(prompt, repoPath);
+    const output = rawOutput.trim();
     const summary = extractSummary(output);
 
     // 5. Push branch and create draft PR

@@ -27,6 +27,8 @@ export {
 export type { TriageResult } from "./triage.js";
 export { triageTask } from "./triage.js";
 
+export { runAgent } from "./agent.js";
+
 export type { DelegationResult, DelegationPollerOpts } from "./delegate.js";
 export {
   pollDelegatedTasks,
