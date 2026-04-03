@@ -26,15 +26,20 @@ const MARKER_PREFIX = '<!-- cherry-task-id:';
 
 const LABELS = {
   [SYNC_LABEL]: { color: 'd4a373', description: 'Synced from tasks.md' },
-  P0: { color: 'd73a4a', description: 'Priority: must do now' },
-  P1: { color: 'e8a317', description: 'Priority: should do this week' },
-  P2: { color: '0e8a16', description: 'Priority: nice to have' },
   blocked: { color: 'b60205', description: 'Task is blocked' },
   'in-progress': { color: '1d76db', description: 'Task in progress' },
   'size-S': { color: 'c5def5', description: 'Small (1-2h)' },
   'size-M': { color: 'bfd4f2', description: 'Medium (3-8h)' },
   'size-L': { color: 'a2c4e0', description: 'Large (1+ days)' },
 };
+
+const MILESTONES = {
+  P0: 'P0 — Must do now',
+  P1: 'P1 — Should do this week',
+  P2: 'P2 — Nice to have',
+};
+
+const ASSIGNEE = 'samantafluture';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -226,6 +231,28 @@ function ensureLabels(extraTags) {
   }
 }
 
+// ── Milestone setup ─────────────────────────────────────────────────
+
+function ensureMilestones() {
+  console.log('Ensuring milestones exist...');
+
+  // Get existing milestones
+  const json = gh('api repos/{owner}/{repo}/milestones --jq ".[].title"');
+  const existing = new Set(json ? json.split('\n').filter(Boolean) : []);
+
+  for (const [, title] of Object.entries(MILESTONES)) {
+    if (!existing.has(title)) {
+      console.log(`  Creating milestone: ${title}`);
+      gh(`api repos/{owner}/{repo}/milestones -f title="${title}" -f state=open`);
+    }
+  }
+}
+
+function getMilestoneNumber(milestoneTitle) {
+  const json = gh('api repos/{owner}/{repo}/milestones --jq ".[] | select(.title==\\"' + milestoneTitle + '\\") | .number"');
+  return json ? parseInt(json, 10) : null;
+}
+
 // ── Issue body builder ───────────────────────────────────────────────
 
 function buildBody(task) {
@@ -265,7 +292,7 @@ function buildBody(task) {
 
 function fetchExistingIssues() {
   const json = gh(
-    `issue list --label "${SYNC_LABEL}" --state all --limit 500 --json number,title,body,state,labels`
+    `issue list --label "${SYNC_LABEL}" --state all --limit 500 --json number,title,body,state,labels,milestone,assignees`
   );
   if (!json) return new Map();
 
@@ -281,6 +308,8 @@ function fetchExistingIssues() {
         body: issue.body,
         state: issue.state,
         labels: issue.labels?.map((l) => l.name) || [],
+        milestone: issue.milestone?.title || null,
+        assignees: issue.assignees?.map((a) => a.login) || [],
       });
     }
   }
@@ -291,11 +320,9 @@ function fetchExistingIssues() {
 function computeLabels(task) {
   const labels = [SYNC_LABEL];
 
-  // Priority / blocked
+  // Blocked as label (priority goes to milestones)
   if (task.priority === 'blocked') {
     labels.push('blocked');
-  } else {
-    labels.push(task.priority);
   }
 
   // Size
@@ -315,6 +342,22 @@ function computeLabels(task) {
   return [...new Set(labels)];
 }
 
+function setMilestone(issueNumber, task) {
+  const milestoneTitle = MILESTONES[task.priority];
+  if (!milestoneTitle) return; // blocked tasks don't get a milestone
+
+  const milestoneNumber = getMilestoneNumber(milestoneTitle);
+  if (milestoneNumber) {
+    gh(`api repos/{owner}/{repo}/issues/${issueNumber} -f milestone=${milestoneNumber} --method PATCH`);
+  }
+}
+
+function setAssignee(issueNumber, task) {
+  if (task.isManual) {
+    gh(`issue edit ${issueNumber} --add-assignee "${ASSIGNEE}"`);
+  }
+}
+
 function syncIssues(tasks) {
   const existing = fetchExistingIssues();
   const seenIds = new Set();
@@ -331,6 +374,8 @@ function syncIssues(tasks) {
     const labels = computeLabels(task);
     const labelsStr = labels.map((l) => `"${l}"`).join(',');
     const body = buildBody(task);
+    const desiredMilestone = MILESTONES[task.priority] || null;
+    const desiredAssignee = task.isManual ? ASSIGNEE : null;
 
     if (!issue) {
       // New task — create Issue
@@ -341,9 +386,17 @@ function syncIssues(tasks) {
       }
 
       console.log(`  CREATE: ${task.title}`);
-      gh(`issue create --title "${task.title.replace(/"/g, '\\"')}" --label ${labelsStr} --body-file -`, {
-        input: body,
-      });
+      const createArgs = [`issue create --title "${task.title.replace(/"/g, '\\"')}" --label ${labelsStr}`];
+      if (desiredAssignee) createArgs.push(`--assignee "${desiredAssignee}"`);
+      createArgs.push('--body-file -');
+      const result = gh(createArgs.join(' '), { input: body });
+
+      // Extract issue number from the URL returned by gh issue create
+      const issueUrl = result.trim();
+      const issueNumMatch = issueUrl.match(/\/(\d+)$/);
+      if (issueNumMatch) {
+        setMilestone(issueNumMatch[1], task);
+      }
       created++;
     } else {
       // Existing Issue — update or close/reopen
@@ -357,17 +410,21 @@ function syncIssues(tasks) {
         gh(`issue edit ${issue.number} --title "${task.title.replace(/"/g, '\\"')}" --add-label ${labelsStr} --body-file -`, {
           input: body,
         });
+        setMilestone(issue.number, task);
+        setAssignee(issue.number, task);
         reopened++;
       } else if (issue.state === 'OPEN') {
-        // Check if update needed (compare body and labels)
+        // Check if update needed (compare body, labels, milestone, assignee)
         const currentLabels = new Set(issue.labels);
         const desiredLabels = new Set(labels);
         const labelsChanged =
           currentLabels.size !== desiredLabels.size ||
           [...desiredLabels].some((l) => !currentLabels.has(l));
         const bodyChanged = issue.body?.trim() !== body.trim();
+        const milestoneChanged = issue.milestone !== desiredMilestone;
+        const assigneeChanged = desiredAssignee && !issue.assignees.includes(desiredAssignee);
 
-        if (labelsChanged || bodyChanged) {
+        if (labelsChanged || bodyChanged || milestoneChanged || assigneeChanged) {
           console.log(`  UPDATE: #${issue.number} ${task.title}`);
           // Remove old labels that aren't in the desired set
           const toRemove = [...currentLabels].filter((l) => !desiredLabels.has(l));
@@ -381,6 +438,8 @@ function syncIssues(tasks) {
           gh(`issue edit ${issue.number} --title "${task.title.replace(/"/g, '\\"')}" --add-label ${labelsStr} --body-file -`, {
             input: body,
           });
+          setMilestone(issue.number, task);
+          setAssignee(issue.number, task);
           updated++;
         } else {
           skipped++;
@@ -425,6 +484,7 @@ function main() {
   }
 
   ensureLabels(allTags);
+  ensureMilestones();
   syncIssues(tasks);
 }
 
