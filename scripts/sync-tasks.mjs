@@ -44,7 +44,9 @@ const ASSIGNEE = 'samantafluture';
 // ── Helpers ──────────────────────────────────────────────────────────
 
 function gh(args, { input } = {}) {
-  const repoFlag = REPO ? ` --repo ${REPO}` : '';
+  // Don't append --repo to `gh api` calls — they use {owner}/{repo} placeholders
+  const isApiCall = args.startsWith('api ');
+  const repoFlag = REPO && !isApiCall ? ` --repo ${REPO}` : '';
   const cmd = `gh ${args}${repoFlag}`;
   try {
     return execSync(cmd, {
@@ -233,24 +235,45 @@ function ensureLabels(extraTags) {
 
 // ── Milestone setup ─────────────────────────────────────────────────
 
+function ghApi(endpoint, extraArgs = '') {
+  const repo = REPO || execSync('gh repo view --json nameWithOwner --jq .nameWithOwner', { encoding: 'utf-8' }).trim();
+  const url = endpoint.replace('{repo}', `repos/${repo}`);
+  const cmd = `gh api ${url} ${extraArgs}`.trim();
+  try {
+    return execSync(cmd, { encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 }).trim();
+  } catch (err) {
+    console.error(`gh api failed: ${cmd}`);
+    console.error(err.stderr || err.message);
+    throw err;
+  }
+}
+
 function ensureMilestones() {
   console.log('Ensuring milestones exist...');
 
-  // Get existing milestones
-  const json = gh('api repos/{owner}/{repo}/milestones --jq ".[].title"');
-  const existing = new Set(json ? json.split('\n').filter(Boolean) : []);
+  let existing = new Set();
+  try {
+    const json = ghApi('{repo}/milestones', '--jq ".[].title"');
+    existing = new Set(json ? json.split('\n').filter(Boolean) : []);
+  } catch {
+    // No milestones yet
+  }
 
   for (const [, title] of Object.entries(MILESTONES)) {
     if (!existing.has(title)) {
       console.log(`  Creating milestone: ${title}`);
-      gh(`api repos/{owner}/{repo}/milestones -f title="${title}" -f state=open`);
+      ghApi('{repo}/milestones', `-f title="${title}" -f state=open`);
     }
   }
 }
 
 function getMilestoneNumber(milestoneTitle) {
-  const json = gh('api repos/{owner}/{repo}/milestones --jq ".[] | select(.title==\\"' + milestoneTitle + '\\") | .number"');
-  return json ? parseInt(json, 10) : null;
+  try {
+    const json = ghApi('{repo}/milestones', `--jq '.[] | select(.title=="${milestoneTitle}") | .number'`);
+    return json ? parseInt(json, 10) : null;
+  } catch {
+    return null;
+  }
 }
 
 // ── Issue body builder ───────────────────────────────────────────────
@@ -348,7 +371,7 @@ function setMilestone(issueNumber, task) {
 
   const milestoneNumber = getMilestoneNumber(milestoneTitle);
   if (milestoneNumber) {
-    gh(`api repos/{owner}/{repo}/issues/${issueNumber} -f milestone=${milestoneNumber} --method PATCH`);
+    ghApi(`{repo}/issues/${issueNumber}`, `-F milestone=${milestoneNumber} --method PATCH`);
   }
 }
 
