@@ -1,0 +1,40 @@
+name: Sync tasks.md → GitHub Issues
+
+on:
+  workflow_call:
+    inputs:
+      tasks-file:
+        description: 'Path to tasks.md relative to repo root'
+        required: false
+        type: string
+        default: '.claude/tasks.md'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+    steps:
+      - name: Checkout calling repo
+        uses: actions/checkout@v4
+
+      - name: Checkout sync script from cherryagent
+        uses: actions/checkout@v4
+        with:
+          repository: samantafluture/cherryagent
+          path: .cherry-sync
+          sparse-checkout: scripts/sync-tasks.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run sync
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TASKS_FILE: ${{ inputs.tasks-file }}
+          REPO: ${{ github.repository }}
+        run: node .cherry-sync/scripts/sync-tasks.mjs
