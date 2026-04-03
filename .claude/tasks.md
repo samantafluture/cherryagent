@@ -6,7 +6,6 @@
 ## Active Sprint
 
 ### P0 — Must do now
-- [ ] Test cherry-sync GitHub Issues integration `[S]` #devops
 
 ### P1 — Should do this week
 
@@ -15,6 +14,7 @@
 ## Blocked
 
 ## Completed (recent)
+- [x] Test cherry-sync GitHub Issues integration `[S]` #devops ✅ 2026-04-03
 
 ## Notes
 - Check CLAUDE.md for architectural decisions before starting work
