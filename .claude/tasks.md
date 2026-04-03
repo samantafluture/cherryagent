@@ -1,6 +1,3 @@
-<!-- Auto-generated from Notion. Do not edit manually. -->
-<!-- Last sync: 2026-04-03T16:12:17.153Z -->
-<!-- Source: https://www.notion.so/83f6c83bb3a546cda0739e7f25382a9a -->
 # Project: CherryAgent
 
 > Last synced to repo: 2026-04-03T20:00:02+00:00
