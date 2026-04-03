@@ -5,7 +5,6 @@ import { createYouTubeHandlers } from "./handlers/youtube.js";
 import { createReportHandlers } from "./handlers/report.js";
 import { createCostHandlers } from "./handlers/cost.js";
 import { createInspirationHandlers } from "./handlers/inspiration.js";
-import { createTaskHandlers } from "./handlers/tasks.js";
 import { createBlogHandlers } from "./handlers/blog.js";
 import { createVoiceHandlers } from "./handlers/voice.js";
 import { createSpoonHandlers } from "./handlers/spoon.js";
@@ -55,7 +54,6 @@ export function createBot(deps: BotDeps) {
 
   const costHandlers = createCostHandlers(costConfig);
 
-  const taskHandlers = createTaskHandlers();
   const blogHandlers = createBlogHandlers();
 
   const spoonHandlers = createSpoonHandlers();
@@ -92,8 +90,6 @@ export function createBot(deps: BotDeps) {
   bot.command("yt", ytHandlers.handleYtCommand);
   bot.command("report", reportHandlers.handleReportCommand);
   bot.command("cost", costHandlers.handleCostCommand);
-  bot.command("tasks", taskHandlers.handleTasksCommand);
-  bot.command("task", taskHandlers.handleTaskCommand);
   bot.command("blog", blogHandlers.handleBlogCommand);
   bot.command("spoon", spoonHandlers.handleSpoonCommand);
   bot.command("voicereset", voiceHandlers.handleVoiceReset);
@@ -109,8 +105,6 @@ export function createBot(deps: BotDeps) {
     { command: "yt", description: "YouTube — download, transcribe, notes" },
     { command: "cost", description: "AI spend report — today, week, month" },
     { command: "inspo", description: "Upload photo to Inspiration Board" },
-    { command: "tasks", description: "View tasks — /tasks all or /tasks <project>" },
-    { command: "task", description: "Manage tasks — add, done, wip, block, etc." },
     { command: "blog", description: "Blog — ideas, drafts, status" },
     { command: "spoon", description: "Spoon tracker — morning/evening check-in, report" },
     { command: "voicereset", description: "Clear active voice coding session" },
@@ -139,9 +133,6 @@ export function createBot(deps: BotDeps) {
   // Callback queries (confirmation buttons)
   bot.on("callback_query:data", async (ctx) => {
     const data = ctx.callbackQuery?.data ?? "";
-    if (data.startsWith("task_")) {
-      return taskHandlers.handleTaskCallback(ctx);
-    }
     if (data.startsWith("spoon_")) {
       return spoonHandlers.handleCallback(ctx);
     }

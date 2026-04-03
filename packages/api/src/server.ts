@@ -2,7 +2,6 @@ import Fastify from "fastify";
 import { healthRoutes } from "./routes/health.js";
 import { fitbitCallbackRoute } from "./routes/fitbit-callback.js";
 import { githubWebhookRoute } from "./routes/github-webhook.js";
-import { notionSyncRoute } from "./routes/notion-sync.js";
 import type { FitbitAuth, GitSyncResult } from "@cherryagent/tools";
 
 interface ServerDeps {
@@ -11,9 +10,6 @@ interface ServerDeps {
     repoMap: Map<string, string>;
     webhookSecret: string;
     onConflict?: (repoPath: string, result: GitSyncResult) => void;
-  };
-  notionSync?: {
-    onError?: (project: string, error: Error) => void;
   };
 }
 
@@ -32,10 +28,6 @@ export async function createServer(deps?: ServerDeps) {
 
   if (deps?.githubWebhook) {
     await app.register(githubWebhookRoute(deps.githubWebhook));
-  }
-
-  if (deps?.notionSync) {
-    await app.register(notionSyncRoute(deps.notionSync));
   }
 
   return app;

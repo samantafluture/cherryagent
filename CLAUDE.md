@@ -178,4 +178,11 @@ See `.env.example` for full list.
 ---
 
 ## Task Management
-Tasks: .claude/tasks.md
+
+- Tasks are tracked in `.claude/tasks.md` -- this is the single source of truth
+- Before starting work, read `.claude/tasks.md` to understand priorities
+- Respect priority order: finish all P0 before starting P1
+- **CRITICAL: After ANY change to tasks.md, immediately commit and push**
+  - Commit message: `chore: update tasks` (always this exact message)
+  - Never batch task updates with code changes in the same commit
+  - Push immediately after commit -- the VPS webhook syncs within seconds

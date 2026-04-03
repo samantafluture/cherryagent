@@ -149,18 +149,3 @@ export {
   removeFavoriteByIndex,
 } from "./media/yt-favorites.js";
 
-// Notion
-export type { NotionTask, NotionProjectMapping, SyncResult, NotionSyncSchedulerOpts } from "./notion/index.js";
-export {
-  queryTasksByProject,
-  queryRecentlyCompleted,
-  queryAllActiveTasks,
-  queryAllRecentlyCompleted,
-  getProjectMapping,
-  getAllProjectMappings,
-  buildTaskFile,
-  renderTasksMarkdown,
-  syncProject,
-  syncAllProjects,
-  startNotionSyncScheduler,
-} from "./notion/index.js";
