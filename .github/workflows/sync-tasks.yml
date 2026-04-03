@@ -1,6 +1,9 @@
 name: Sync tasks.md → GitHub Issues
 
 on:
+  push:
+    branches: [main]
+    paths: ['.claude/tasks.md']
   workflow_call:
     inputs:
       tasks-file:
