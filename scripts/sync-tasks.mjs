@@ -473,6 +473,15 @@ function syncIssues(tasks) {
     }
   }
 
+  // Close orphaned issues (task removed from tasks.md)
+  for (const [id, issue] of existing) {
+    if (!seenIds.has(id) && issue.state === 'OPEN') {
+      console.log(`  CLOSE (orphan): #${issue.number} ${issue.title}`);
+      gh(`issue close ${issue.number} --comment "Task removed from tasks.md"`);
+      closed++;
+    }
+  }
+
   console.log(
     `\nSync complete: ${created} created, ${updated} updated, ${closed} closed, ${reopened} reopened, ${skipped} unchanged`
   );
