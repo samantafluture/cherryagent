@@ -11,6 +11,7 @@
 - [ ] Export fresh YouTube cookies.txt from desktop Chrome + set YTDLP_COOKIES_FILE=/app/cookies.txt in .env + restart container 👤 manual `[S]` #bug
 ### P1 — Should do this week
 
+- [ ] Enhance /yt notes: always use Gemini video mode (not transcript), add personal insights pipeline — after delivering standard notes, auto-create backlog task for deep analysis that cross-references video with Sam's projects/context and produces actionable insights doc via Telegram interview `[L]` #feature
 ### P2 — Nice to have
 
 ## Blocked
