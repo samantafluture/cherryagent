@@ -1,11 +1,8 @@
 import { createReadStream } from "node:fs";
 import type { Context } from "grammy";
-import { InputFile } from "grammy";
-import type { GeminiProvider, GroqWhisperClient } from "@cherryagent/core";
-import {
-  YOUTUBE_NOTES_SYSTEM_PROMPT,
-  YOUTUBE_NOTES_RICH_SYSTEM_PROMPT,
-} from "@cherryagent/core";
+import { InputFile, InlineKeyboard } from "grammy";
+import type { GeminiProvider } from "@cherryagent/core";
+import { YOUTUBE_NOTES_SYSTEM_PROMPT } from "@cherryagent/core";
 import {
   isYouTubeUrl,
   validateYouTubeUrl,
@@ -18,6 +15,7 @@ import {
   checkSpendWarning,
 } from "@cherryagent/tools";
 import type { YouTubeMode, MediaConfig, ProgressStep } from "@cherryagent/tools";
+import { setInsightsPending } from "./youtube-insights.js";
 
 const TELEGRAM_FILE_LIMIT = 50 * 1024 * 1024; // 50MB
 
@@ -29,20 +27,18 @@ const PROGRESS_LABELS: Record<ProgressStep, string> = {
   downloading_video: "Downloading video...",
   downloading_audio: "Downloading audio...",
   extracting_audio: "Extracting audio...",
-  transcribing: "Transcribing (Whisper)...",
   generating_notes: "Generating notes...",
   done: "Done!",
 };
 
 interface YouTubeDeps {
-  whisper: GroqWhisperClient;
   gemini: GeminiProvider;
   mediaConfig: MediaConfig;
   costConfig?: { timezone?: string; dailyCapUsd?: number; monthlyCapUsd?: number };
 }
 
 export function createYouTubeHandlers(deps: YouTubeDeps) {
-  const { whisper, gemini, mediaConfig } = deps;
+  const { gemini, mediaConfig } = deps;
 
   async function handleYtCommand(ctx: Context) {
     const text = (ctx.match as string | undefined)?.trim();
@@ -94,6 +90,9 @@ export function createYouTubeHandlers(deps: YouTubeDeps) {
     if (urls.length === 0) {
       return ctx.reply("No valid YouTube URL found. Send a youtube.com or youtu.be link.");
     }
+
+    // `rich` is now an alias for `full` (all modes use Gemini video)
+    if (mode === "rich") mode = "full";
 
     // Process each URL sequentially
     for (const url of urls) {
@@ -193,10 +192,8 @@ export function createYouTubeHandlers(deps: YouTubeDeps) {
         url,
         mode,
         {
-          whisper,
           llm: gemini,
           notesSystemPrompt: YOUTUBE_NOTES_SYSTEM_PROMPT,
-          richNotesSystemPrompt: YOUTUBE_NOTES_RICH_SYSTEM_PROMPT,
         },
         mediaConfig,
         updateProgress,
@@ -249,6 +246,24 @@ export function createYouTubeHandlers(deps: YouTubeDeps) {
         await ctx.replyWithDocument(file, {
           caption: `Notes for "${title}"`,
         });
+
+        // Offer deep analysis via insights pipeline
+        setInsightsPending({
+          chatId: String(chatId),
+          videoTitle: title,
+          videoAuthor: result.metadata.authorName,
+          notes: result.notes,
+          questionIndex: -1,
+          answers: [],
+          createdAt: Date.now(),
+        });
+
+        const insightsKeyboard = new InlineKeyboard()
+          .text("\ud83d\udd0d Start deep analysis", "yt_insights_start");
+        await ctx.reply(
+          "Want me to cross-reference this with your projects and produce actionable insights?",
+          { reply_markup: insightsKeyboard },
+        );
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

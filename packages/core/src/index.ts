@@ -12,7 +12,7 @@ export {
 } from "./prompts/food-logging.js";
 export {
   YOUTUBE_NOTES_SYSTEM_PROMPT,
-  YOUTUBE_NOTES_RICH_SYSTEM_PROMPT,
+  YOUTUBE_INSIGHTS_SYSTEM_PROMPT,
 } from "./prompts/youtube-notes.js";
 export type {
   AgentLoopConfig,

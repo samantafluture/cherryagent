@@ -7,34 +7,12 @@ import { extractAudio } from "./extract-audio.js";
 
 // ─── Dependency interfaces (injected by caller to avoid circular deps) ───
 
-interface TranscriptionSegment {
-  start: number;
-  end: number;
-  text: string;
-}
-
-interface TranscriptionResult {
-  text: string;
-  segments: TranscriptionSegment[];
-  durationSeconds: number;
-}
-
-interface WhisperClient {
-  transcribe(audioPath: string, language?: string): Promise<TranscriptionResult>;
-  estimateCost(durationSeconds: number): number;
-}
-
 interface LLMChatResponse {
   content: string | null;
   usage: { inputTokens: number; outputTokens: number };
 }
 
 interface LLMClient {
-  chat(params: {
-    systemInstruction?: string;
-    messages: { role: "user" | "system" | "assistant" | "tool"; content: string }[];
-    maxTokens?: number;
-  }): Promise<LLMChatResponse>;
   chatWithVideo(params: {
     prompt: string;
     videoPath: string;
@@ -46,10 +24,8 @@ interface LLMClient {
 }
 
 export interface PipelineDeps {
-  whisper: WhisperClient;
   llm: LLMClient;
   notesSystemPrompt: string;
-  richNotesSystemPrompt: string;
 }
 
 /** Overall pipeline timeout: 15 minutes max for the entire operation */
@@ -79,116 +55,66 @@ async function runPipelineInner(
   let totalCost = 0;
 
   const onRetry = (attempt: number, total: number, reason: string) => {
-    onProgress?.("downloading_audio", `Retry ${attempt}/${total - 1} (${reason})…`);
+    onProgress?.("downloading_video", `Retry ${attempt}/${total - 1} (${reason})…`);
   };
 
   // Step 1: Validate
   onProgress?.("validating");
   const metadata: VideoMetadata = await validateYouTubeUrl(url);
 
-  // Step 2: Download
-  let videoPath: string | undefined;
-  let videoSizeBytes: number | undefined;
+  // Step 2: Download video (all modes now require video for Gemini chatWithVideo)
+  onProgress?.("downloading_video", metadata.title);
+  const videoResult = await downloadVideo({
+    url,
+    title: metadata.title,
+    mode: "video",
+    config,
+    onRetry,
+  });
+  const videoPath = videoResult.filePath;
+  const videoSizeBytes = videoResult.fileSizeBytes;
+
+  // Step 3: Extract audio (for modes that deliver audio)
   let audioPath: string | undefined;
   let audioSizeBytes: number | undefined;
+  const needsAudio = mode === "full" || mode === "rich" || mode === "audio";
 
-  const needsVideo = mode === "full" || mode === "rich";
-
-  if (needsVideo) {
-    onProgress?.("downloading_video", metadata.title);
-    const videoResult = await downloadVideo({
-      url,
-      title: metadata.title,
-      mode: "video",
-      config,
-      onRetry,
-    });
-    videoPath = videoResult.filePath;
-    videoSizeBytes = videoResult.fileSizeBytes;
-
-    // Extract audio from video
+  if (needsAudio) {
     onProgress?.("extracting_audio");
-    audioPath = videoPath.replace(/\.mp4$/, ".mp3");
-    const audioResult = await extractAudio(videoPath, audioPath, config.audioBitrate, config.extractionTimeoutMs);
+    const destAudioPath = videoPath.replace(/\.mp4$/, ".mp3");
+    const audioResult = await extractAudio(videoPath, destAudioPath, config.audioBitrate, config.extractionTimeoutMs);
+    audioPath = destAudioPath;
     audioSizeBytes = audioResult.fileSizeBytes;
     metadata.durationSeconds = audioResult.durationSeconds;
-  } else {
-    // Audio-only download
-    onProgress?.("downloading_audio", metadata.title);
-    const audioResult = await downloadVideo({
-      url,
-      title: metadata.title,
-      mode: "audio",
-      config,
-      onRetry,
-    });
-    audioPath = audioResult.filePath;
-    audioSizeBytes = audioResult.fileSizeBytes;
   }
 
-  // Step 3: Generate notes
-  let notes: string;
+  // Step 4: Generate notes via Gemini video input (all modes)
+  onProgress?.("generating_notes", "Gemini (video)");
+  const response = await deps.llm.chatWithVideo({
+    prompt: `Generate detailed reading notes for this video titled "${metadata.title}" by ${metadata.authorName}.`,
+    videoPath,
+    systemInstruction: deps.notesSystemPrompt,
+    maxTokens: 8192,
+  });
+  const notes = response.content ?? "Failed to generate notes.";
+  totalCost += estimateLLMCost(deps.llm, response.usage);
 
-  if (mode === "rich") {
-    // Path B: Gemini multimodal video input
-    onProgress?.("generating_notes", "Gemini (rich mode)");
-    const response = await deps.llm.chatWithVideo({
-      prompt: `Generate detailed reading notes for this video titled "${metadata.title}" by ${metadata.authorName}.`,
-      videoPath: videoPath!,
-      systemInstruction: deps.richNotesSystemPrompt,
-      maxTokens: 8192,
-    });
-    notes = response.content ?? "Failed to generate notes.";
-    totalCost += estimateLLMCost(deps.llm, response.usage);
-  } else {
-    // Path A: Whisper transcription → Gemini notes
-    onProgress?.("transcribing", "Groq Whisper");
-    const transcription = await deps.whisper.transcribe(audioPath!);
-    totalCost += deps.whisper.estimateCost(transcription.durationSeconds);
-    metadata.durationSeconds = transcription.durationSeconds;
-
-    // Build timestamped transcript for the notes prompt
-    const transcript = transcription.segments
-      .map((s) => {
-        const mins = Math.floor(s.start / 60);
-        const secs = Math.floor(s.start % 60);
-        const ts = `${mins}:${secs.toString().padStart(2, "0")}`;
-        return `[${ts}] ${s.text}`;
-      })
-      .join("\n");
-
-    onProgress?.("generating_notes", "Gemini");
-    const response = await deps.llm.chat({
-      systemInstruction: deps.notesSystemPrompt,
-      messages: [
-        {
-          role: "user",
-          content: `Video title: "${metadata.title}" by ${metadata.authorName}\n\nTimestamped transcript:\n${transcript}`,
-        },
-      ],
-      maxTokens: 4096,
-    });
-    notes = response.content ?? "Failed to generate notes.";
-    totalCost += estimateLLMCost(deps.llm, response.usage);
-  }
-
-  // Step 4: Cleanup for notes-only mode (delete audio after transcription)
-  if (mode === "notes" && audioPath) {
+  // Step 5: Cleanup — delete video for modes that don't deliver it
+  const deliversVideo = mode === "full" || mode === "rich";
+  if (!deliversVideo) {
     try {
-      await unlink(audioPath);
+      await unlink(videoPath);
     } catch {
       // non-critical
     }
-    audioPath = undefined;
-    audioSizeBytes = undefined;
   }
 
   onProgress?.("done");
 
   return {
     metadata,
-    videoPath,
-    videoSizeBytes,
+    videoPath: deliversVideo ? videoPath : undefined,
+    videoSizeBytes: deliversVideo ? videoSizeBytes : undefined,
     audioPath,
     audioSizeBytes,
     notes,

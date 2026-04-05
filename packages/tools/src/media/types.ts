@@ -35,7 +35,6 @@ export type ProgressStep =
   | "downloading_video"
   | "downloading_audio"
   | "extracting_audio"
-  | "transcribing"
   | "generating_notes"
   | "done";
 

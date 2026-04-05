@@ -148,4 +148,5 @@ export {
   getFavoriteByIndex,
   removeFavoriteByIndex,
 } from "./media/yt-favorites.js";
+export { readBrainContext } from "./media/brain-context.js";
 

@@ -2,6 +2,7 @@ import { Bot } from "grammy";
 import { authMiddleware } from "./middleware.js";
 import { createFoodLogHandlers } from "./handlers/food-log.js";
 import { createYouTubeHandlers } from "./handlers/youtube.js";
+import { createInsightsHandlers } from "./handlers/youtube-insights.js";
 import { createReportHandlers } from "./handlers/report.js";
 import { createCostHandlers } from "./handlers/cost.js";
 import { createInspirationHandlers } from "./handlers/inspiration.js";
@@ -46,9 +47,13 @@ export function createBot(deps: BotDeps) {
   });
 
   const ytHandlers = createYouTubeHandlers({
-    whisper: deps.whisper,
     gemini: deps.gemini,
     mediaConfig: deps.mediaConfig,
+    costConfig,
+  });
+
+  const insightsHandlers = createInsightsHandlers({
+    gemini: deps.gemini,
     costConfig,
   });
 
@@ -122,10 +127,12 @@ export function createBot(deps: BotDeps) {
     return foodHandlers.handlePhoto(ctx);
   });
 
-  // Text handler — voice edit → spoon → food
+  // Text handler — voice edit → insights interview → spoon → food
   bot.on("message:text", async (ctx) => {
     const voiceHandled = await voiceHandlers.handleVoiceText(ctx);
     if (voiceHandled) return;
+    const insightsHandled = await insightsHandlers.handleText(ctx);
+    if (insightsHandled) return;
     const spoonHandled = await spoonHandlers.handleText(ctx);
     if (!spoonHandled) return foodHandlers.handleText(ctx);
   });
@@ -138,6 +145,9 @@ export function createBot(deps: BotDeps) {
     }
     if (data.startsWith("voice_")) {
       return voiceHandlers.handleVoiceCallback(ctx);
+    }
+    if (data.startsWith("yt_insights_")) {
+      return insightsHandlers.handleCallback(ctx);
     }
     return foodHandlers.handleCallback(ctx);
   });
