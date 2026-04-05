@@ -1,8 +1,11 @@
 import { createReadStream } from "node:fs";
 import type { Context } from "grammy";
 import { InputFile, InlineKeyboard } from "grammy";
-import type { GeminiProvider } from "@cherryagent/core";
-import { YOUTUBE_NOTES_SYSTEM_PROMPT } from "@cherryagent/core";
+import type { GeminiProvider, GroqWhisperClient } from "@cherryagent/core";
+import {
+  YOUTUBE_NOTES_SYSTEM_PROMPT,
+  YOUTUBE_NOTES_RICH_SYSTEM_PROMPT,
+} from "@cherryagent/core";
 import {
   isYouTubeUrl,
   validateYouTubeUrl,
@@ -19,7 +22,7 @@ import { setInsightsPending } from "./youtube-insights.js";
 
 const TELEGRAM_FILE_LIMIT = 50 * 1024 * 1024; // 50MB
 
-const VALID_MODES = new Set<YouTubeMode>(["full", "rich", "audio", "notes"]);
+const VALID_MODES = new Set<YouTubeMode>(["full", "audio", "notes"]);
 const SUBCOMMANDS = new Set(["save", "list", "pick", "rm"]);
 
 const PROGRESS_LABELS: Record<ProgressStep, string> = {
@@ -27,33 +30,37 @@ const PROGRESS_LABELS: Record<ProgressStep, string> = {
   downloading_video: "Downloading video...",
   downloading_audio: "Downloading audio...",
   extracting_audio: "Extracting audio...",
+  transcribing: "Transcribing (Whisper)...",
   generating_notes: "Generating notes...",
   done: "Done!",
 };
 
 interface YouTubeDeps {
+  whisper: GroqWhisperClient;
   gemini: GeminiProvider;
   mediaConfig: MediaConfig;
   costConfig?: { timezone?: string; dailyCapUsd?: number; monthlyCapUsd?: number };
 }
 
 export function createYouTubeHandlers(deps: YouTubeDeps) {
-  const { gemini, mediaConfig } = deps;
+  const { whisper, gemini, mediaConfig } = deps;
 
   async function handleYtCommand(ctx: Context) {
     const text = (ctx.match as string | undefined)?.trim();
     if (!text) {
       return ctx.reply(
-        "Usage: /yt [mode] <url>\n\n" +
+        "Usage: /yt [mode] [rich] <url>\n\n" +
         "Modes:\n" +
         "  full — video + audio + notes (default)\n" +
-        "  rich — video + audio + notes (Gemini multimodal)\n" +
         "  audio — audio + notes only\n" +
         "  notes — notes only\n\n" +
+        "Add \"rich\" to any mode for Gemini video-based notes:\n" +
+        "  /yt rich <url> — full + Gemini video notes\n" +
+        "  /yt notes rich <url> — notes only, Gemini video\n\n" +
         "Favorites:\n" +
         "  /yt save <url> — save for later\n" +
         "  /yt list — show saved videos\n" +
-        "  /yt pick <#> [mode] — process a saved video\n" +
+        "  /yt pick <#> [mode] [rich] — process a saved video\n" +
         "  /yt rm <#> — remove from list\n\n" +
         "Batch: send multiple URLs on separate lines",
       );
@@ -71,18 +78,22 @@ export function createYouTubeHandlers(deps: YouTubeDeps) {
       }
     }
 
-    // Parse URLs and mode from the input
+    // Parse URLs, mode, and rich flag from the input
     const lines = text.split(/\n/).map((l) => l.trim()).filter(Boolean);
     const urls: string[] = [];
     let mode: YouTubeMode = "full";
+    let rich = false;
 
     for (const line of lines) {
       const parts = line.split(/\s+/);
       for (const part of parts) {
+        const lower = part.toLowerCase();
         if (isYouTubeUrl(part)) {
           urls.push(part);
-        } else if (VALID_MODES.has(part as YouTubeMode)) {
-          mode = part as YouTubeMode;
+        } else if (lower === "rich") {
+          rich = true;
+        } else if (VALID_MODES.has(lower as YouTubeMode)) {
+          mode = lower as YouTubeMode;
         }
       }
     }
@@ -91,12 +102,9 @@ export function createYouTubeHandlers(deps: YouTubeDeps) {
       return ctx.reply("No valid YouTube URL found. Send a youtube.com or youtu.be link.");
     }
 
-    // `rich` is now an alias for `full` (all modes use Gemini video)
-    if (mode === "rich") mode = "full";
-
     // Process each URL sequentially
     for (const url of urls) {
-      await processOneUrl(ctx, url, mode);
+      await processOneUrl(ctx, url, mode, rich);
     }
   }
 
@@ -143,19 +151,23 @@ export function createYouTubeHandlers(deps: YouTubeDeps) {
     const parts = rest.split(/\s+/).filter(Boolean);
     const index = Number(parts[0]);
     if (!index || index < 1) {
-      return ctx.reply("Usage: /yt pick <#> [mode]");
+      return ctx.reply("Usage: /yt pick <#> [mode] [rich]");
     }
 
-    const mode: YouTubeMode = VALID_MODES.has(parts[1] as YouTubeMode)
-      ? (parts[1] as YouTubeMode)
-      : "full";
+    let mode: YouTubeMode = "full";
+    let rich = false;
+    for (const p of parts.slice(1)) {
+      const lower = p.toLowerCase();
+      if (lower === "rich") rich = true;
+      else if (VALID_MODES.has(lower as YouTubeMode)) mode = lower as YouTubeMode;
+    }
 
     const item = await getFavoriteByIndex(index);
     if (!item) {
       return ctx.reply(`No saved video at #${index}. Use /yt list to see your list.`);
     }
 
-    await processOneUrl(ctx, item.url, mode);
+    await processOneUrl(ctx, item.url, mode, rich);
   }
 
   async function handleRemove(ctx: Context, rest: string) {
@@ -172,7 +184,7 @@ export function createYouTubeHandlers(deps: YouTubeDeps) {
     return ctx.reply(`Removed: "${removed.title}"`);
   }
 
-  async function processOneUrl(ctx: Context, url: string, mode: YouTubeMode) {
+  async function processOneUrl(ctx: Context, url: string, mode: YouTubeMode, rich: boolean) {
     // Send initial progress message
     const progressMsg = await ctx.reply("Processing YouTube URL...");
     const chatId = ctx.chat!.id;
@@ -191,9 +203,12 @@ export function createYouTubeHandlers(deps: YouTubeDeps) {
       const result = await runYouTubePipeline(
         url,
         mode,
+        rich,
         {
+          whisper,
           llm: gemini,
           notesSystemPrompt: YOUTUBE_NOTES_SYSTEM_PROMPT,
+          richNotesSystemPrompt: YOUTUBE_NOTES_RICH_SYSTEM_PROMPT,
         },
         mediaConfig,
         updateProgress,
@@ -206,7 +221,7 @@ export function createYouTubeHandlers(deps: YouTubeDeps) {
         result.metadata.durationSeconds
           ? `Duration: ${formatDuration(result.metadata.durationSeconds)}`
           : null,
-        `Mode: ${mode} | Cost: $${result.costUsd.toFixed(3)}`,
+        `Mode: ${mode}${rich ? " rich" : ""} | Cost: $${result.costUsd.toFixed(3)}`,
       ].filter(Boolean).join("\n");
 
       await ctx.api.editMessageText(chatId, progressMsg.message_id, doneText);

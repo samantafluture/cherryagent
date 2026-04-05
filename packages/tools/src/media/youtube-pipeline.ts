@@ -7,12 +7,34 @@ import { extractAudio } from "./extract-audio.js";
 
 // ─── Dependency interfaces (injected by caller to avoid circular deps) ───
 
+interface TranscriptionSegment {
+  start: number;
+  end: number;
+  text: string;
+}
+
+interface TranscriptionResult {
+  text: string;
+  segments: TranscriptionSegment[];
+  durationSeconds: number;
+}
+
+interface WhisperClient {
+  transcribe(audioPath: string, language?: string): Promise<TranscriptionResult>;
+  estimateCost(durationSeconds: number): number;
+}
+
 interface LLMChatResponse {
   content: string | null;
   usage: { inputTokens: number; outputTokens: number };
 }
 
 interface LLMClient {
+  chat(params: {
+    systemInstruction?: string;
+    messages: { role: "user" | "system" | "assistant" | "tool"; content: string }[];
+    maxTokens?: number;
+  }): Promise<LLMChatResponse>;
   chatWithVideo(params: {
     prompt: string;
     videoPath: string;
@@ -24,22 +46,28 @@ interface LLMClient {
 }
 
 export interface PipelineDeps {
+  whisper: WhisperClient;
   llm: LLMClient;
   notesSystemPrompt: string;
+  richNotesSystemPrompt: string;
 }
 
 /** Overall pipeline timeout: 15 minutes max for the entire operation */
 const PIPELINE_TIMEOUT_MS = 900_000;
 
+/**
+ * @param rich — when true, uses Gemini chatWithVideo instead of Whisper transcription for notes
+ */
 export async function runYouTubePipeline(
   url: string,
   mode: YouTubeMode,
+  rich: boolean,
   deps: PipelineDeps,
   config: MediaConfig,
   onProgress?: (step: ProgressStep, detail?: string) => void,
 ): Promise<PipelineResult> {
   return withTimeout(
-    () => runPipelineInner(url, mode, deps, config, onProgress),
+    () => runPipelineInner(url, mode, rich, deps, config, onProgress),
     PIPELINE_TIMEOUT_MS,
     "YouTube pipeline timed out — the video may be too long or YouTube is blocking downloads. Try again later.",
   );
@@ -48,6 +76,7 @@ export async function runYouTubePipeline(
 async function runPipelineInner(
   url: string,
   mode: YouTubeMode,
+  rich: boolean,
   deps: PipelineDeps,
   config: MediaConfig,
   onProgress?: (step: ProgressStep, detail?: string) => void,
@@ -62,59 +91,123 @@ async function runPipelineInner(
   onProgress?.("validating");
   const metadata: VideoMetadata = await validateYouTubeUrl(url);
 
-  // Step 2: Download video (all modes now require video for Gemini chatWithVideo)
-  onProgress?.("downloading_video", metadata.title);
-  const videoResult = await downloadVideo({
-    url,
-    title: metadata.title,
-    mode: "video",
-    config,
-    onRetry,
-  });
-  const videoPath = videoResult.filePath;
-  const videoSizeBytes = videoResult.fileSizeBytes;
-
-  // Step 3: Extract audio (for modes that deliver audio)
+  // Step 2: Download
+  // Rich mode always needs video (for Gemini chatWithVideo).
+  // Non-rich: full downloads video, audio/notes download audio only.
+  const needsVideo = rich || mode === "full";
+  let videoPath: string | undefined;
+  let videoSizeBytes: number | undefined;
   let audioPath: string | undefined;
   let audioSizeBytes: number | undefined;
-  const needsAudio = mode === "full" || mode === "rich" || mode === "audio";
 
-  if (needsAudio) {
+  if (needsVideo) {
+    onProgress?.("downloading_video", metadata.title);
+    const videoResult = await downloadVideo({
+      url,
+      title: metadata.title,
+      mode: "video",
+      config,
+      onRetry,
+    });
+    videoPath = videoResult.filePath;
+    videoSizeBytes = videoResult.fileSizeBytes;
+
+    // Extract audio from video (for delivery or transcription in non-rich full mode)
     onProgress?.("extracting_audio");
     const destAudioPath = videoPath.replace(/\.mp4$/, ".mp3");
     const audioResult = await extractAudio(videoPath, destAudioPath, config.audioBitrate, config.extractionTimeoutMs);
     audioPath = destAudioPath;
     audioSizeBytes = audioResult.fileSizeBytes;
     metadata.durationSeconds = audioResult.durationSeconds;
+  } else {
+    // Audio-only download (non-rich audio/notes modes)
+    onProgress?.("downloading_audio", metadata.title);
+    const audioResult = await downloadVideo({
+      url,
+      title: metadata.title,
+      mode: "audio",
+      config,
+      onRetry,
+    });
+    audioPath = audioResult.filePath;
+    audioSizeBytes = audioResult.fileSizeBytes;
   }
 
-  // Step 4: Generate notes via Gemini video input (all modes)
-  onProgress?.("generating_notes", "Gemini (video)");
-  const response = await deps.llm.chatWithVideo({
-    prompt: `Generate detailed reading notes for this video titled "${metadata.title}" by ${metadata.authorName}.`,
-    videoPath,
-    systemInstruction: deps.notesSystemPrompt,
-    maxTokens: 8192,
-  });
-  const notes = response.content ?? "Failed to generate notes.";
-  totalCost += estimateLLMCost(deps.llm, response.usage);
+  // Step 3: Generate notes
+  let notes: string;
 
-  // Step 5: Cleanup — delete video for modes that don't deliver it
-  const deliversVideo = mode === "full" || mode === "rich";
-  if (!deliversVideo) {
+  if (rich) {
+    // Rich path: Gemini multimodal video input
+    onProgress?.("generating_notes", "Gemini (video)");
+    const response = await deps.llm.chatWithVideo({
+      prompt: `Generate detailed reading notes for this video titled "${metadata.title}" by ${metadata.authorName}.`,
+      videoPath: videoPath!,
+      systemInstruction: deps.richNotesSystemPrompt,
+      maxTokens: 8192,
+    });
+    notes = response.content ?? "Failed to generate notes.";
+    totalCost += estimateLLMCost(deps.llm, response.usage);
+  } else {
+    // Default path: Whisper transcription → LLM notes
+    onProgress?.("transcribing", "Groq Whisper");
+    const transcription = await deps.whisper.transcribe(audioPath!);
+    totalCost += deps.whisper.estimateCost(transcription.durationSeconds);
+    metadata.durationSeconds = transcription.durationSeconds;
+
+    const transcript = transcription.segments
+      .map((s) => {
+        const mins = Math.floor(s.start / 60);
+        const secs = Math.floor(s.start % 60);
+        const ts = `${mins}:${secs.toString().padStart(2, "0")}`;
+        return `[${ts}] ${s.text}`;
+      })
+      .join("\n");
+
+    onProgress?.("generating_notes", "Gemini");
+    const response = await deps.llm.chat({
+      systemInstruction: deps.notesSystemPrompt,
+      messages: [
+        {
+          role: "user",
+          content: `Video title: "${metadata.title}" by ${metadata.authorName}\n\nTimestamped transcript:\n${transcript}`,
+        },
+      ],
+      maxTokens: 4096,
+    });
+    notes = response.content ?? "Failed to generate notes.";
+    totalCost += estimateLLMCost(deps.llm, response.usage);
+  }
+
+  // Step 4: Cleanup
+  // Delete video for modes that don't deliver it
+  const deliversVideo = mode === "full";
+  if (videoPath && !deliversVideo) {
     try {
       await unlink(videoPath);
     } catch {
       // non-critical
     }
+    videoPath = undefined;
+    videoSizeBytes = undefined;
+  }
+
+  // Delete audio for notes-only mode
+  if (mode === "notes" && audioPath) {
+    try {
+      await unlink(audioPath);
+    } catch {
+      // non-critical
+    }
+    audioPath = undefined;
+    audioSizeBytes = undefined;
   }
 
   onProgress?.("done");
 
   return {
     metadata,
-    videoPath: deliversVideo ? videoPath : undefined,
-    videoSizeBytes: deliversVideo ? videoSizeBytes : undefined,
+    videoPath,
+    videoSizeBytes,
     audioPath,
     audioSizeBytes,
     notes,

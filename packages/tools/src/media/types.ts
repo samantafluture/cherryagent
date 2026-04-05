@@ -1,4 +1,4 @@
-export type YouTubeMode = "full" | "rich" | "audio" | "notes";
+export type YouTubeMode = "full" | "audio" | "notes";
 
 export interface VideoMetadata {
   title: string;
@@ -35,6 +35,7 @@ export type ProgressStep =
   | "downloading_video"
   | "downloading_audio"
   | "extracting_audio"
+  | "transcribing"
   | "generating_notes"
   | "done";
 

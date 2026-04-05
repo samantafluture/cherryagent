@@ -47,6 +47,7 @@ export function createBot(deps: BotDeps) {
   });
 
   const ytHandlers = createYouTubeHandlers({
+    whisper: deps.whisper,
     gemini: deps.gemini,
     mediaConfig: deps.mediaConfig,
     costConfig,
