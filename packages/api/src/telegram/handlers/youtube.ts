@@ -283,11 +283,26 @@ export function createYouTubeHandlers(deps: YouTubeDeps) {
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      await ctx.api.editMessageText(
-        chatId,
-        progressMsg.message_id,
-        `Failed to process video:\n${message}`,
-      );
+      const isAuthError = [
+        "Sign in to confirm you're not a bot",
+        "Sign in to confirm your age",
+        "This request was detected as a bot",
+      ].some((p) => message.includes(p));
+
+      if (isAuthError) {
+        await ctx.api.editMessageText(
+          chatId,
+          progressMsg.message_id,
+          "YouTube auth failed — cookies may have expired.\n\n" +
+          "Send a fresh cookies.txt file here to update.",
+        );
+      } else {
+        await ctx.api.editMessageText(
+          chatId,
+          progressMsg.message_id,
+          `Failed to process video:\n${message}`,
+        );
+      }
     }
   }
 
