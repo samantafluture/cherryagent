@@ -7,6 +7,17 @@ echo "==> Configuring git identity..."
 git config user.email "sam@cherryagent.dev"
 git config user.name "sam"
 
+echo "==> Cleaning stale git lock files..."
+for lockfile in .git/index.lock .git/refs/heads/main.lock .git/HEAD.lock; do
+  if [ -f "$lockfile" ]; then
+    echo "    Removing stale $lockfile"
+    rm -f "$lockfile"
+  fi
+done
+
+echo "==> Checking out main branch..."
+git checkout main 2>/dev/null || git checkout -b main origin/main
+
 echo "==> Pulling latest code..."
 git clean -fd --exclude=.claude/tasks.md
 git checkout -- . ':!.claude/tasks.md'
