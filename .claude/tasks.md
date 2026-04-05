@@ -9,7 +9,7 @@
 ### P1 — Should do this week
 
 - [ ] Enhance /yt notes: always use Gemini video mode (not transcript), add personal insights pipeline — after delivering standard notes, auto-create backlog task for deep analysis that cross-references video with Sam's projects/context and produces actionable insights doc via Telegram interview `[L]` #feature
-- [ ] Harden deploy.sh: auto-checkout main and delete stale .git lock files before pull to prevent CI failures from leftover claude/* branches `[S]` #devops
+- [x] Harden deploy.sh: auto-checkout main and delete stale .git lock files before pull to prevent CI failures from leftover claude/* branches `[S]` #devops ✅ 2026-04-04
 ### P2 — Nice to have
 
 ## Blocked
