@@ -49,6 +49,7 @@ export function createBot(deps: BotDeps) {
   const ytHandlers = createYouTubeHandlers({
     whisper: deps.whisper,
     gemini: deps.gemini,
+    botToken: deps.token,
     mediaConfig: deps.mediaConfig,
     costConfig,
   });
@@ -126,6 +127,16 @@ export function createBot(deps: BotDeps) {
       return inspoHandlers.handleInspoPhoto(ctx);
     }
     return foodHandlers.handlePhoto(ctx);
+  });
+
+  // Document handler — cookies upload
+  bot.on("message:document", (ctx) => {
+    const name = (ctx.message.document.file_name ?? "").toLowerCase();
+    const caption = (ctx.message.caption ?? "").toLowerCase();
+    if (name.endsWith(".txt") && (name.includes("cookie") || caption === "/cookies")) {
+      return ytHandlers.handleCookiesUpload(ctx);
+    }
+    // Future: other document types can be handled here
   });
 
   // Text handler — voice edit → insights interview → spoon → food

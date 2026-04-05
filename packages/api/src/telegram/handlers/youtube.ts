@@ -1,4 +1,4 @@
-import { createReadStream } from "node:fs";
+import { createReadStream, writeFileSync } from "node:fs";
 import type { Context } from "grammy";
 import { InputFile, InlineKeyboard } from "grammy";
 import type { GeminiProvider, GroqWhisperClient } from "@cherryagent/core";
@@ -38,12 +38,13 @@ const PROGRESS_LABELS: Record<ProgressStep, string> = {
 interface YouTubeDeps {
   whisper: GroqWhisperClient;
   gemini: GeminiProvider;
+  botToken: string;
   mediaConfig: MediaConfig;
   costConfig?: { timezone?: string; dailyCapUsd?: number; monthlyCapUsd?: number };
 }
 
 export function createYouTubeHandlers(deps: YouTubeDeps) {
-  const { whisper, gemini, mediaConfig } = deps;
+  const { whisper, gemini, botToken, mediaConfig } = deps;
 
   async function handleYtCommand(ctx: Context) {
     const text = (ctx.match as string | undefined)?.trim();
@@ -317,7 +318,53 @@ export function createYouTubeHandlers(deps: YouTubeDeps) {
     }
   }
 
-  return { handleYtCommand };
+  async function handleCookiesUpload(ctx: Context): Promise<void> {
+    const doc = ctx.message?.document;
+    if (!doc) return;
+
+    if (!mediaConfig.cookiesFile) {
+      await ctx.reply("YTDLP_COOKIES_FILE env var is not set. Can't save cookies.");
+      return;
+    }
+
+    // Download the file
+    const file = await ctx.api.getFile(doc.file_id);
+    if (!file.file_path) {
+      await ctx.reply("Couldn't download the file. Try again?");
+      return;
+    }
+
+    const fileUrl = `https://api.telegram.org/file/bot${botToken}/${file.file_path}`;
+    const response = await fetch(fileUrl);
+    if (!response.ok) {
+      await ctx.reply("Failed to download file from Telegram.");
+      return;
+    }
+
+    const content = await response.text();
+
+    // Validate it's a Netscape cookies file
+    const firstLine = content.split("\n")[0] ?? "";
+    if (!firstLine.includes("Cookie File")) {
+      await ctx.reply(
+        "This doesn't look like a valid cookies file.\n" +
+        "Expected first line: # Netscape HTTP Cookie File\n\n" +
+        "Export from your browser using a cookies.txt extension.",
+      );
+      return;
+    }
+
+    // Write to the configured path
+    writeFileSync(mediaConfig.cookiesFile, content, "utf-8");
+
+    const lines = content.split("\n").filter((l) => l.trim() && !l.startsWith("#")).length;
+    await ctx.reply(
+      `Cookies updated (${lines} entries, ${content.length} bytes).\n` +
+      "Next /yt command will use the new cookies.",
+    );
+  }
+
+  return { handleYtCommand, handleCookiesUpload };
 }
 
 function formatDuration(seconds: number): string {
