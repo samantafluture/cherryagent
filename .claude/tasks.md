@@ -6,9 +6,6 @@
 ## Active Sprint
 
 ### P0 — Must do now
-
-- [ ] Bug: /yt command fails — YouTube requires cookie auth for yt-dlp downloads `[M]` #bug 🔴 blocked: Needs fresh cookies.txt exported from desktop browser + YTDLP_COOKIES_FILE env var set
-- [ ] Export fresh YouTube cookies.txt from desktop Chrome + set YTDLP_COOKIES_FILE=/app/cookies.txt in .env + restart container 👤 manual `[S]` #bug
 ### P1 — Should do this week
 
 - [ ] Enhance /yt notes: always use Gemini video mode (not transcript), add personal insights pipeline — after delivering standard notes, auto-create backlog task for deep analysis that cross-references video with Sam's projects/context and produces actionable insights doc via Telegram interview `[L]` #feature
@@ -18,6 +15,8 @@
 ## Blocked
 
 ## Completed (recent)
+- [x] Bug: /yt command fails — YouTube requires cookie auth for yt-dlp downloads `[M]` #bug ✅ 2026-04-04
+- [x] Export fresh YouTube cookies.txt from desktop Chrome + set YTDLP_COOKIES_FILE=/app/cookies.txt in .env + restart container 👤 manual `[S]` #bug ✅ 2026-04-04
 - [x] Test cherry-sync GitHub Issues integration `[S]` #devops ✅ 2026-04-03
 
 ## Notes
