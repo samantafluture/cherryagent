@@ -1,10 +1,12 @@
+import { readFileSync, writeFileSync, unlinkSync, mkdirSync } from "node:fs";
+import { join, dirname } from "node:path";
 import type { Context } from "grammy";
 import { InputFile } from "grammy";
 import type { GeminiProvider } from "@cherryagent/core";
 import { YOUTUBE_INSIGHTS_SYSTEM_PROMPT } from "@cherryagent/core";
 import { readBrainContext, logCost, checkSpendWarning } from "@cherryagent/tools";
 
-// ─── State ──────────────────────────────────────────────────────
+// ─── File-backed state (survives container restarts) ────────────
 
 export interface InsightsPendingState {
   chatId: string;
@@ -16,27 +18,45 @@ export interface InsightsPendingState {
   createdAt: number;
 }
 
-const pendingInsights = new Map<string, InsightsPendingState>();
-
 /** 1 hour timeout for pending insights interviews */
 const INSIGHTS_TIMEOUT_MS = 60 * 60 * 1000;
 
+function getStatePath(): string {
+  const home = process.env["HOME"] ?? ".";
+  return join(home, ".cherryagent", "yt-insights-pending.json");
+}
+
 export function setInsightsPending(state: InsightsPendingState): void {
-  pendingInsights.set(state.chatId, state);
+  const path = getStatePath();
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, JSON.stringify(state), "utf-8");
 }
 
 function getInsightsPending(chatId: string): InsightsPendingState | null {
-  const state = pendingInsights.get(chatId);
-  if (!state) return null;
-  if (Date.now() - state.createdAt > INSIGHTS_TIMEOUT_MS) {
-    pendingInsights.delete(chatId);
+  try {
+    const data = readFileSync(getStatePath(), "utf-8");
+    const state: InsightsPendingState = JSON.parse(data);
+    if (state.chatId !== chatId) return null;
+    if (Date.now() - state.createdAt > INSIGHTS_TIMEOUT_MS) {
+      deleteInsightsPending();
+      return null;
+    }
+    return state;
+  } catch {
     return null;
   }
-  return state;
 }
 
-function deleteInsightsPending(chatId: string): void {
-  pendingInsights.delete(chatId);
+function saveInsightsPending(state: InsightsPendingState): void {
+  writeFileSync(getStatePath(), JSON.stringify(state), "utf-8");
+}
+
+function deleteInsightsPending(): void {
+  try {
+    unlinkSync(getStatePath());
+  } catch {
+    // already gone
+  }
 }
 
 // ─── Interview questions ────────────────────────────────────────
@@ -72,6 +92,7 @@ export function createInsightsHandlers(deps: InsightsDeps) {
 
     // Start the interview — ask question 0
     state.questionIndex = 0;
+    saveInsightsPending(state);
     await ctx.reply(
       `Deep analysis for "${state.videoTitle}"\n\n` +
       `Question 1/${INTERVIEW_QUESTIONS.length}:\n${INTERVIEW_QUESTIONS[0]}`,
@@ -99,6 +120,7 @@ export function createInsightsHandlers(deps: InsightsDeps) {
     if (nextIndex < INTERVIEW_QUESTIONS.length) {
       // Ask the next question
       state.questionIndex = nextIndex;
+      saveInsightsPending(state);
       await ctx.reply(
         `Question ${nextIndex + 1}/${INTERVIEW_QUESTIONS.length}:\n${INTERVIEW_QUESTIONS[nextIndex]}`,
       );
@@ -107,7 +129,7 @@ export function createInsightsHandlers(deps: InsightsDeps) {
 
     // All questions answered — generate insights
     await ctx.reply("All answers collected. Generating your insights doc...");
-    deleteInsightsPending(chatId);
+    deleteInsightsPending();
 
     try {
       const brainContext = await readBrainContext();
