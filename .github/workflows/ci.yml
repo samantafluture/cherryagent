@@ -48,7 +48,6 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             git config --global --add safe.directory /home/sam/apps/cherryagent
-            sudo chown -R sam:sam ~/apps/cherryagent
             cd ~/apps/cherryagent
             git fetch origin main
             git reset --hard origin/main
