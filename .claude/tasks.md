@@ -1,23 +1,23 @@
 # Project: CherryAgent
 
-> Last synced to repo: 2026-04-06T17:40:01+00:00
-> Last agent update: 2026-04-05
+> Last synced to repo: 2026-04-06
+> Last agent update: 2026-04-06
 
 ## Active Sprint
 
 ### P0 — Must do now
-### P1 — Should do this week
+(none)
 
-- [x] Enhance /yt notes: always use Gemini video mode (not transcript), add personal insights pipeline — after delivering standard notes, auto-create backlog task for deep analysis that cross-references video with Sam's projects/context and produces actionable insights doc via Telegram interview `[L]` #feature ✅ 2026-04-04
-- [x] Harden deploy.sh: auto-checkout main and delete stale .git lock files before pull to prevent CI failures from leftover claude/* branches `[S]` #devops ✅ 2026-04-04
+### P1 — Should do this week
+- [ ] Add notes/body support to CherryTask sync so detailed context maps to GitHub Issue body instead of title (256 char limit) `[M]` #cherrytask
+- [ ] Fix EACCES permission errors on .claude/tasks.md across all VPS projects caused by container user (node, UID 1000) vs host user (sam) mismatch `[S]` #devops
+
 ### P2 — Nice to have
 
 ## Blocked
 
 ## Completed (recent)
-- [x] Bug: /yt command fails — YouTube requires cookie auth for yt-dlp downloads `[M]` #bug ✅ 2026-04-04
-- [x] Export fresh YouTube cookies.txt from desktop Chrome + set YTDLP_COOKIES_FILE=/app/cookies.txt in .env + restart container 👤 manual `[S]` #bug ✅ 2026-04-04
-- [x] Test cherry-sync GitHub Issues integration `[S]` #devops ✅ 2026-04-03
 
 ## Notes
-- Check CLAUDE.md for architectural decisions before starting work
+- CherryTask sync currently uses the full task checkbox line as the GitHub Issue title. Titles over 256 chars or containing backticks cause sync failures. Need a parsing format (e.g. indented lines below a task, or a delimiter) that maps to the issue body while keeping the first line as the title.
+- The EACCES bug affects any project where the Dockerfile runs as node (UID 1000) but mounted volume files are owned by sam on the host. Workaround is manual chown -R 1000:1000 on the project dir, but this breaks on every deploy/restart. Fix should be in Dockerfile user config, entrypoint script, or docker-compose volume permissions.
