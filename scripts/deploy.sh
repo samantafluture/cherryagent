@@ -3,6 +3,9 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+echo "==> Marking repo as safe directory..."
+git config --global --add safe.directory "$(pwd)"
+
 echo "==> Configuring git identity..."
 git config user.email "sam@cherryagent.dev"
 git config user.name "sam"
