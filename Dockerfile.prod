@@ -60,9 +60,9 @@ COPY --from=build /app/packages/tools/dist/ packages/tools/dist/
 COPY --from=build /app/packages/api/dist/ packages/api/dist/
 
 # Create data directories for token storage and media
-# Use 1001:1001 to match docker-compose user override for git repo access
+# node user is UID 1000:GID 1000 in official Node images — match host sam user
 RUN mkdir -p /home/node/.cherryagent /opt/cherry-agent/media \
-  && chown -R 1001:1001 /home/node/.cherryagent /opt/cherry-agent/media
+  && chown -R node:node /home/node/.cherryagent /opt/cherry-agent/media
 
 # Git config for CherryTasks sync
 RUN git config --system safe.directory '*' \
