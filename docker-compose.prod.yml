@@ -8,7 +8,7 @@ services:
     restart: unless-stopped
     networks:
       - infra-net
-    user: "1000:1000"  # match host sam (UID 1000) + node user in container
+    user: "1001:1001"  # match VPS host sam (UID 1001:GID 1001)
     volumes:
       - cherryagent-data:/home/node/.cherryagent
       - cherryagent-media:/opt/cherry-agent/media

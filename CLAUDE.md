@@ -46,7 +46,7 @@ docker compose up -d  # Dev: PostgreSQL + Redis
 
 ## Deploy
 
-Docker multi-stage build (includes ffmpeg, python3, yt-dlp). Runs as non-root (node, UID 1000:1000). Prod: `docker compose -f docker-compose.prod.yml up -d`.
+Docker multi-stage build (includes ffmpeg, python3, yt-dlp). Runs as non-root (UID 1001:1001 matching VPS sam). Prod: `docker compose -f docker-compose.prod.yml up -d`.
 
 ## Env
 
