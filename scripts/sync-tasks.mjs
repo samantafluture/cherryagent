@@ -66,6 +66,11 @@ function taskId(title) {
   return createHash('sha256').update(normalized).digest('hex').slice(0, 12);
 }
 
+/** Escape a string for safe use inside shell double-quotes */
+function shellEscape(str) {
+  return str.replace(/[\\"$`!]/g, '\\$&');
+}
+
 function cleanTitle(line) {
   return (
     line
@@ -86,6 +91,8 @@ function cleanTitle(line) {
       .replace(/\bin-progress\b/gi, '')
       .replace(/\bmanual\b/gi, '')
       .replace(/\bblocked:\s*.*/gi, '')
+      // Remove backticks (prevent shell interpretation in gh commands)
+      .replace(/`/g, '')
       // Collapse whitespace
       .replace(/\s+/g, ' ')
       .trim()
@@ -144,8 +151,18 @@ function parseTasks(markdown) {
     // Stop processing in Notes section
     if (inNotes) continue;
 
-    // Skip blockquote lines (agent notes, metadata)
-    if (/^\s*>/.test(line)) continue;
+    // Blockquote lines: collect indented `>` lines as task body if they follow a task
+    if (/^\s{2,}>/.test(line)) {
+      if (currentTask) {
+        // Strip leading whitespace and the `> ` prefix, keep the rest
+        const bodyLine = line.replace(/^\s+>\s?/, '');
+        currentTask.bodyLines.push(bodyLine);
+      }
+      continue;
+    }
+
+    // Skip top-level blockquote lines (file-level metadata like "Last synced")
+    if (/^>/.test(line)) continue;
 
     // Top-level task line
     const taskMatch = line.match(/^- \[([ /x])\]\s+(.+)/);
@@ -184,10 +201,13 @@ function parseTasks(markdown) {
       const dateMatch = rest.match(/(?:✅\s*)?(\d{4}-\d{2}-\d{2})/);
       const completionDate = dateMatch ? dateMatch[1] : null;
 
+      // Truncate title to stay within GitHub's 256 char limit
+      const safeTitle = title.length > 256 ? title.slice(0, 253) + '...' : title;
+
       currentTask = {
-        title,
+        title: safeTitle,
         rawLine: line.trim(),
-        id: taskId(title),
+        id: taskId(title), // hash uses full title for stable IDs
         status,
         priority,
         size,
@@ -195,6 +215,7 @@ function parseTasks(markdown) {
         isManual,
         blockedReason,
         subtasks: [],
+        bodyLines: [],
         completionDate,
         inCompleted,
       };
@@ -281,6 +302,12 @@ function getMilestoneNumber(milestoneTitle) {
 function buildBody(task) {
   const parts = [`${MARKER_PREFIX} ${task.id} -->`];
   parts.push('');
+
+  // Task body/notes from indented `>` lines in tasks.md
+  if (task.bodyLines && task.bodyLines.length > 0) {
+    parts.push(task.bodyLines.join('\n'));
+    parts.push('');
+  }
 
   // Metadata line
   const meta = [];
@@ -409,7 +436,7 @@ function syncIssues(tasks) {
       }
 
       console.log(`  CREATE: ${task.title}`);
-      const createArgs = [`issue create --title "${task.title.replace(/"/g, '\\"')}" --label ${labelsStr}`];
+      const createArgs = [`issue create --title "${shellEscape(task.title)}" --label ${labelsStr}`];
       if (desiredAssignee) createArgs.push(`--assignee "${desiredAssignee}"`);
       createArgs.push('--body-file -');
       const result = gh(createArgs.join(' '), { input: body });
@@ -430,7 +457,7 @@ function syncIssues(tasks) {
       } else if (task.status !== 'done' && issue.state === 'CLOSED') {
         console.log(`  REOPEN: #${issue.number} ${task.title}`);
         gh(`issue reopen ${issue.number}`);
-        gh(`issue edit ${issue.number} --title "${task.title.replace(/"/g, '\\"')}" --add-label ${labelsStr} --body-file -`, {
+        gh(`issue edit ${issue.number} --title "${shellEscape(task.title)}" --add-label ${labelsStr} --body-file -`, {
           input: body,
         });
         setMilestone(issue.number, task);
@@ -458,7 +485,7 @@ function syncIssues(tasks) {
               // Label might not exist, ignore
             }
           }
-          gh(`issue edit ${issue.number} --title "${task.title.replace(/"/g, '\\"')}" --add-label ${labelsStr} --body-file -`, {
+          gh(`issue edit ${issue.number} --title "${shellEscape(task.title)}" --add-label ${labelsStr} --body-file -`, {
             input: body,
           });
           setMilestone(issue.number, task);
