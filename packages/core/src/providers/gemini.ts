@@ -23,6 +23,25 @@ export interface ChatWithVideoParams {
   maxTokens?: number;
 }
 
+export interface ChatWithYouTubeUrlParams {
+  prompt: string;
+  youtubeUrl: string;
+  systemInstruction?: string;
+  temperature?: number;
+  maxTokens?: number;
+}
+
+export interface ChatWithGroundingParams {
+  prompt: string;
+  systemInstruction?: string;
+  temperature?: number;
+  maxTokens?: number;
+}
+
+export interface GroundedResponse extends LLMResponse {
+  groundingChunks: { title: string; uri: string }[];
+}
+
 export interface TranscribeAudioParams {
   audioBuffer: Buffer;
   mimeType?: string;
@@ -39,6 +58,7 @@ interface GeminiContent {
 type GeminiPart =
   | { text: string }
   | { inlineData: { data: string; mimeType: string } }
+  | { fileData: { fileUri: string; mimeType: string } }
   | { functionCall: { name: string; args: Record<string, unknown> } }
   | { functionResponse: { name: string; response: Record<string, unknown> } };
 
@@ -181,7 +201,7 @@ export class GeminiProvider implements LLMProvider {
       {
         role: "user",
         parts: [
-          { fileData: { fileUri: file.uri!, mimeType: params.mimeType ?? "video/mp4" } } as unknown as GeminiPart,
+          { fileData: { fileUri: file.uri!, mimeType: params.mimeType ?? "video/mp4" } },
           { text: params.prompt },
         ],
       },
@@ -211,6 +231,78 @@ export class GeminiProvider implements LLMProvider {
     }
 
     return this.normalizeResponse(response);
+  }
+
+  async chatWithYouTubeUrl(params: ChatWithYouTubeUrlParams): Promise<LLMResponse> {
+    const contents: GeminiContent[] = [
+      {
+        role: "user",
+        parts: [
+          { fileData: { fileUri: params.youtubeUrl, mimeType: "video/mp4" } },
+          { text: params.prompt },
+        ],
+      },
+    ];
+
+    const config: Record<string, unknown> = {
+      temperature: params.temperature ?? 0.3,
+      maxOutputTokens: params.maxTokens ?? 8192,
+      thinkingConfig: { thinkingBudget: 0 },
+    };
+
+    if (params.systemInstruction) {
+      config.systemInstruction = params.systemInstruction;
+    }
+
+    const response = await this.client.models.generateContent({
+      model: this.model,
+      contents,
+      config,
+    });
+
+    return this.normalizeResponse(response);
+  }
+
+  async chatWithGrounding(params: ChatWithGroundingParams): Promise<GroundedResponse> {
+    const contents: GeminiContent[] = [
+      {
+        role: "user",
+        parts: [{ text: params.prompt }],
+      },
+    ];
+
+    const config: Record<string, unknown> = {
+      temperature: params.temperature ?? 0.3,
+      maxOutputTokens: params.maxTokens ?? 4096,
+      thinkingConfig: { thinkingBudget: 0 },
+      tools: [{ googleSearch: {} }],
+    };
+
+    if (params.systemInstruction) {
+      config.systemInstruction = params.systemInstruction;
+    }
+
+    const response = await this.client.models.generateContent({
+      model: this.model,
+      contents,
+      config,
+    });
+
+    const base = this.normalizeResponse(response);
+
+    // Extract grounding metadata
+    const candidate = response.candidates?.[0];
+    const chunks: { title: string; uri: string }[] = [];
+    const groundingChunks = candidate?.groundingMetadata?.groundingChunks;
+    if (Array.isArray(groundingChunks)) {
+      for (const chunk of groundingChunks) {
+        if (chunk.web?.title && chunk.web?.uri) {
+          chunks.push({ title: chunk.web.title, uri: chunk.web.uri });
+        }
+      }
+    }
+
+    return { ...base, groundingChunks: chunks };
   }
 
   async transcribeAudio(params: TranscribeAudioParams): Promise<LLMResponse> {

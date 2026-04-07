@@ -1,7 +1,7 @@
 import { createServer } from "./server.js";
 import { createBot } from "./telegram/bot.js";
-import { GeminiProvider, GroqWhisperClient } from "@cherryagent/core";
-import { FitbitAuth, getMediaConfig, startMediaCleanup, startWeeklyReport, listProjects, startSyncScheduler } from "@cherryagent/tools";
+import { GeminiProvider } from "@cherryagent/core";
+import { FitbitAuth, startWeeklyReport, listProjects, startSyncScheduler } from "@cherryagent/tools";
 import { execFileSync } from "node:child_process";
 
 const PORT = parseInt(process.env["PORT"] ?? "3000", 10);
@@ -30,15 +30,6 @@ async function main() {
       "http://localhost:3000/api/fitbit/callback",
   });
 
-  const whisper = new GroqWhisperClient({
-    apiKey: requireEnv("GROQ_API_KEY"),
-  });
-
-  const mediaConfig = getMediaConfig();
-
-  // Start media cleanup (every 6 hours)
-  const cleanupTimer = startMediaCleanup(mediaConfig);
-
   // Discover projects with tasks.md and start sync scheduler (every 5 min)
   const projects = listProjects();
   const repoPaths = projects.map((p) => p.repoPath);
@@ -50,7 +41,7 @@ async function main() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           chat_id: requireEnv("TELEGRAM_CHAT_ID"),
-          text: `⚠️ <b>Git sync conflict</b>\n<code>${repoPath}</code>\n${message}`,
+          text: `\u26a0\ufe0f <b>Git sync conflict</b>\n<code>${repoPath}</code>\n${message}`,
           parse_mode: "HTML",
         }),
       },
@@ -132,8 +123,6 @@ async function main() {
     authorizedChatId: telegramChatId,
     gemini,
     fitbitAuth,
-    whisper,
-    mediaConfig,
   });
 
   bot.start({
@@ -143,7 +132,6 @@ async function main() {
   // Graceful shutdown
   const shutdown = async () => {
     console.log("Shutting down...");
-    clearInterval(cleanupTimer);
     clearInterval(weeklyReportTimer);
     clearInterval(syncTimer);
     await bot.stop();

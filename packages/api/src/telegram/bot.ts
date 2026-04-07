@@ -2,23 +2,20 @@ import { Bot } from "grammy";
 import { authMiddleware } from "./middleware.js";
 import { createFoodLogHandlers } from "./handlers/food-log.js";
 import { createYouTubeHandlers } from "./handlers/youtube.js";
-import { createInsightsHandlers } from "./handlers/youtube-insights.js";
 import { createReportHandlers } from "./handlers/report.js";
 import { createCostHandlers } from "./handlers/cost.js";
 import { createInspirationHandlers } from "./handlers/inspiration.js";
 import { createBlogHandlers } from "./handlers/blog.js";
 import { createVoiceHandlers } from "./handlers/voice.js";
 import { createSpoonHandlers } from "./handlers/spoon.js";
-import type { GeminiProvider, GroqWhisperClient } from "@cherryagent/core";
-import type { FitbitAuth, MediaConfig } from "@cherryagent/tools";
+import type { GeminiProvider } from "@cherryagent/core";
+import type { FitbitAuth } from "@cherryagent/tools";
 
 export interface BotDeps {
   token: string;
   authorizedChatId: string;
   gemini: GeminiProvider;
   fitbitAuth: FitbitAuth;
-  whisper: GroqWhisperClient;
-  mediaConfig: MediaConfig;
 }
 
 export function createBot(deps: BotDeps) {
@@ -47,15 +44,8 @@ export function createBot(deps: BotDeps) {
   });
 
   const ytHandlers = createYouTubeHandlers({
-    whisper: deps.whisper,
     gemini: deps.gemini,
     botToken: deps.token,
-    mediaConfig: deps.mediaConfig,
-    costConfig,
-  });
-
-  const insightsHandlers = createInsightsHandlers({
-    gemini: deps.gemini,
     costConfig,
   });
 
@@ -109,7 +99,7 @@ export function createBot(deps: BotDeps) {
     { command: "food", description: "Food logger help & commands" },
     { command: "fav", description: "Saved foods — list, log, or remove" },
     { command: "report", description: "Saturated fat report (today + weekly)" },
-    { command: "yt", description: "YouTube — download, transcribe, notes" },
+    { command: "yt", description: "YouTube — augmented notes from any video" },
     { command: "cost", description: "AI spend report — today, week, month" },
     { command: "inspo", description: "Upload photo to Inspiration Board" },
     { command: "blog", description: "Blog — ideas, drafts, status" },
@@ -129,22 +119,10 @@ export function createBot(deps: BotDeps) {
     return foodHandlers.handlePhoto(ctx);
   });
 
-  // Document handler — cookies upload
-  bot.on("message:document", (ctx) => {
-    const name = (ctx.message.document.file_name ?? "").toLowerCase();
-    const caption = (ctx.message.caption ?? "").toLowerCase();
-    if (name.endsWith(".txt") && (name.includes("cookie") || caption === "/cookies")) {
-      return ytHandlers.handleCookiesUpload(ctx);
-    }
-    // Future: other document types can be handled here
-  });
-
-  // Text handler — voice edit → insights interview → spoon → food
+  // Text handler — voice edit → spoon → food
   bot.on("message:text", async (ctx) => {
     const voiceHandled = await voiceHandlers.handleVoiceText(ctx);
     if (voiceHandled) return;
-    const insightsHandled = await insightsHandlers.handleText(ctx);
-    if (insightsHandled) return;
     const spoonHandled = await spoonHandlers.handleText(ctx);
     if (!spoonHandled) return foodHandlers.handleText(ctx);
   });
@@ -157,9 +135,6 @@ export function createBot(deps: BotDeps) {
     }
     if (data.startsWith("voice_")) {
       return voiceHandlers.handleVoiceCallback(ctx);
-    }
-    if (data.startsWith("yt_insights_")) {
-      return insightsHandlers.handleCallback(ctx);
     }
     return foodHandlers.handleCallback(ctx);
   });

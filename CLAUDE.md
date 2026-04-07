@@ -43,10 +43,11 @@ docker compose up -d  # Dev: PostgreSQL + Redis
 - **Tiered LLM routing:** Groq (free) -> DeepSeek -> Gemini Flash -> Claude (expensive). Configurable via `AGENT_DEFAULT_MODEL_TIER`. Daily/monthly spend caps enforced.
 - **Tool architecture:** Each tool implements a shared `Tool` interface, registered in central registry. Agent loop dispatches based on intent.
 - **Food logging:** Four inputs (text, barcode, photo, voice) -> all sync to Fitbit API.
+- **YouTube pipeline:** 3-pass augmented notes (Gemini-native, no downloads). Pass 1: Gemini watches video via URL. Pass 2: Google Search grounding verifies references. Pass 3: brain context personalization. Fallback: `youtube-transcript` npm for caption extraction.
 
 ## Deploy
 
-Docker multi-stage build (includes ffmpeg, python3, yt-dlp). Runs as non-root (UID 1001:1001 matching VPS sam). Prod: `docker compose -f docker-compose.prod.yml up -d`.
+Docker multi-stage build. Runs as non-root (UID 1001:1001 matching VPS sam). Prod: `docker compose -f docker-compose.prod.yml up -d`.
 
 ## Env
 

@@ -37,9 +37,8 @@ FROM node:20-alpine AS production
 
 RUN corepack enable && corepack prepare pnpm@10.27.0 --activate
 
-# Install ffmpeg, python3, yt-dlp, yt-dlp-ejs, and git (for CherryTasks sync)
-RUN apk add --no-cache ffmpeg python3 py3-pip git \
-  && pip3 install --no-cache-dir --break-system-packages yt-dlp yt-dlp-ejs
+# Install git (for CherryTasks sync)
+RUN apk add --no-cache git
 
 WORKDIR /app
 
@@ -59,10 +58,10 @@ COPY --from=build /app/packages/core/dist/ packages/core/dist/
 COPY --from=build /app/packages/tools/dist/ packages/tools/dist/
 COPY --from=build /app/packages/api/dist/ packages/api/dist/
 
-# Create data directories for token storage and media
+# Create data directory for token storage
 # VPS host sam is UID 1001:GID 1001 — container must match for volume mounts
-RUN mkdir -p /home/node/.cherryagent /opt/cherry-agent/media \
-  && chown -R 1001:1001 /home/node/.cherryagent /opt/cherry-agent/media
+RUN mkdir -p /home/node/.cherryagent \
+  && chown -R 1001:1001 /home/node/.cherryagent
 
 # Git config for CherryTasks sync
 RUN git config --system safe.directory '*' \

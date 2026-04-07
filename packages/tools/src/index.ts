@@ -124,24 +124,15 @@ export type { SpoonEntry } from "./spoon/spoon-tracker.js";
 export { logSpoon, getSpoonForDate, getSpoonForRange } from "./spoon/spoon-tracker.js";
 export { formatSpoonReport } from "./spoon/spoon-report.js";
 
-// Media
-export type {
-  YouTubeMode,
-  VideoMetadata,
-  DownloadResult,
-  AudioExtractionResult,
-  PipelineResult,
-  ProgressStep,
-  FavoriteItem,
-} from "./media/types.js";
-export type { MediaConfig } from "./media/config.js";
-export { getMediaConfig } from "./media/config.js";
+// Media — Augmented YouTube Pipeline
+export type { VideoMetadata, FavoriteItem } from "./media/types.js";
 export { isYouTubeUrl, validateYouTubeUrl } from "./media/validate-url.js";
-export { downloadVideo } from "./media/download.js";
-export { extractAudio } from "./media/extract-audio.js";
-export { startMediaCleanup, runCleanup } from "./media/cleanup.js";
-export { runYouTubePipeline } from "./media/youtube-pipeline.js";
-export type { PipelineDeps } from "./media/youtube-pipeline.js";
+export { runAugmentedPipeline } from "./media/augmented-pipeline.js";
+export type {
+  AugmentedPipelineDeps,
+  AugmentedPipelineResult,
+  AugmentedProgressStep,
+} from "./media/augmented-pipeline.js";
 export {
   addFavorite,
   listFavorites,
@@ -149,4 +140,4 @@ export {
   removeFavoriteByIndex,
 } from "./media/yt-favorites.js";
 export { readBrainContext } from "./media/brain-context.js";
-
+export { fetchTranscript, extractVideoId } from "./media/transcript-fallback.js";
