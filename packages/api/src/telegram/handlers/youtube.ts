@@ -1,3 +1,5 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import type { Context } from "grammy";
 import { InputFile } from "grammy";
 import type { GeminiProvider } from "@cherryagent/core";
@@ -226,6 +228,22 @@ export function createYouTubeHandlers(deps: YouTubeDeps) {
       await ctx.replyWithDocument(file, {
         caption: `Augmented notes for "${result.metadata.title}"`,
       });
+
+      // Save to brain if BRAIN_DIR is configured
+      const brainDir = process.env.BRAIN_DIR;
+      if (brainDir) {
+        try {
+          const rawDir = join(brainDir, "library", "raw");
+          await mkdir(rawDir, { recursive: true });
+          const date = new Date().toISOString().slice(0, 10);
+          const slug = sanitizeFilename(result.metadata.title).replace(/\s+/g, "-").toLowerCase();
+          const brainFilename = `yt-${slug}-${date}.md`;
+          await writeFile(join(rawDir, brainFilename), result.markdown, "utf-8");
+          await ctx.reply(`Saved to brain: library/raw/${brainFilename}`);
+        } catch {
+          // Non-critical — don't fail the pipeline
+        }
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       await ctx.api.editMessageText(
