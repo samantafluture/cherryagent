@@ -9,7 +9,5 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/"
   },
-  "dependencies": {
-    "youtube-transcript": "^1.3.0"
-  }
+  "dependencies": {}
 }
