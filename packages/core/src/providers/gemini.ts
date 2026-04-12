@@ -42,6 +42,15 @@ export interface GroundedResponse extends LLMResponse {
   groundingChunks: { title: string; uri: string }[];
 }
 
+export interface ChatWithAudioUrlParams {
+  prompt: string;
+  audioUrl: string;
+  mimeType?: string;
+  systemInstruction?: string;
+  temperature?: number;
+  maxTokens?: number;
+}
+
 export interface TranscribeAudioParams {
   audioBuffer: Buffer;
   mimeType?: string;
@@ -261,6 +270,97 @@ export class GeminiProvider implements LLMProvider {
     });
 
     return this.normalizeResponse(response);
+  }
+
+  async chatWithAudioUrl(params: ChatWithAudioUrlParams): Promise<LLMResponse> {
+    // Download audio to a temp buffer, upload via Gemini File API
+    const audioResp = await fetch(params.audioUrl, {
+      signal: AbortSignal.timeout(300_000), // 5 min for large files
+      headers: { "User-Agent": "CherryAgent-Pod/1.0" },
+    });
+
+    if (!audioResp.ok) {
+      throw new Error(`Audio download failed: ${audioResp.status}`);
+    }
+
+    const contentType =
+      params.mimeType ??
+      audioResp.headers.get("content-type")?.split(";")[0] ??
+      "audio/mpeg";
+    const buffer = Buffer.from(await audioResp.arrayBuffer());
+
+    // Write to temp file for Gemini File API
+    const { writeFile, unlink } = await import("node:fs/promises");
+    const { join } = await import("node:path");
+    const { tmpdir } = await import("node:os");
+    const tempPath = join(tmpdir(), `pod-${Date.now()}.mp3`);
+    await writeFile(tempPath, buffer);
+
+    try {
+      // Upload via Gemini File API (same pattern as chatWithVideo)
+      const uploadResult = await this.client.files.upload({
+        file: tempPath,
+        config: { mimeType: contentType },
+      });
+
+      if (!uploadResult.uri) {
+        throw new Error("Gemini File API upload failed");
+      }
+
+      // Poll until processed
+      let file = uploadResult;
+      while (file.state === "PROCESSING") {
+        await new Promise((r) => setTimeout(r, 3000));
+        const fetched = await this.client.files.get({ name: file.name! });
+        file = fetched as typeof file;
+      }
+
+      if (file.state === "FAILED") {
+        throw new Error("Gemini File API audio processing failed");
+      }
+
+      const contents: GeminiContent[] = [
+        {
+          role: "user",
+          parts: [
+            { fileData: { fileUri: file.uri!, mimeType: contentType } },
+            { text: params.prompt },
+          ],
+        },
+      ];
+
+      const config: Record<string, unknown> = {
+        temperature: params.temperature ?? 0.3,
+        maxOutputTokens: params.maxTokens ?? 8192,
+        thinkingConfig: { thinkingBudget: 0 },
+      };
+
+      if (params.systemInstruction) {
+        config.systemInstruction = params.systemInstruction;
+      }
+
+      const response = await this.client.models.generateContent({
+        model: this.model,
+        contents,
+        config,
+      });
+
+      // Clean up uploaded file
+      try {
+        await this.client.files.delete({ name: file.name! });
+      } catch {
+        // non-critical
+      }
+
+      return this.normalizeResponse(response);
+    } finally {
+      // Clean up temp file
+      try {
+        await unlink(tempPath);
+      } catch {
+        // non-critical
+      }
+    }
   }
 
   async chatWithGrounding(params: ChatWithGroundingParams): Promise<GroundedResponse> {

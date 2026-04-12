@@ -141,3 +141,13 @@ export {
 } from "./media/yt-favorites.js";
 export { readBrainContext } from "./media/brain-context.js";
 export { fetchTranscript, extractVideoId } from "./media/transcript-fallback.js";
+
+// Media — Podcast Pipeline
+export type { PodcastMetadata } from "./media/types.js";
+export { isPodcastUrl, validatePodcastUrl } from "./media/validate-podcast.js";
+export { runPodcastPipeline } from "./media/podcast-pipeline.js";
+export type {
+  PodcastPipelineDeps,
+  PodcastPipelineResult,
+  PodcastProgressStep,
+} from "./media/podcast-pipeline.js";

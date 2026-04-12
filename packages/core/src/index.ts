@@ -4,6 +4,7 @@ export type {
   ChatWithImageParams,
   ChatWithVideoParams,
   ChatWithYouTubeUrlParams,
+  ChatWithAudioUrlParams,
   ChatWithGroundingParams,
   GroundedResponse,
 } from "./providers/gemini.js";
@@ -20,6 +21,10 @@ export {
   YOUTUBE_SOURCE_EXPANSION_PROMPT,
   YOUTUBE_PERSONALIZATION_PROMPT,
 } from "./prompts/youtube-notes.js";
+export {
+  PODCAST_COMPREHENSION_PROMPT,
+  PODCAST_COMPREHENSION_TRANSCRIPT_PROMPT,
+} from "./prompts/podcast-notes.js";
 export type {
   AgentLoopConfig,
   ChatParams,

@@ -2,6 +2,7 @@ import { Bot } from "grammy";
 import { authMiddleware } from "./middleware.js";
 import { createFoodLogHandlers } from "./handlers/food-log.js";
 import { createYouTubeHandlers } from "./handlers/youtube.js";
+import { createPodcastHandlers } from "./handlers/podcast.js";
 import { createReportHandlers } from "./handlers/report.js";
 import { createCostHandlers } from "./handlers/cost.js";
 import { createInspirationHandlers } from "./handlers/inspiration.js";
@@ -49,6 +50,12 @@ export function createBot(deps: BotDeps) {
     costConfig,
   });
 
+  const podHandlers = createPodcastHandlers({
+    gemini: deps.gemini,
+    botToken: deps.token,
+    costConfig,
+  });
+
   const costHandlers = createCostHandlers(costConfig);
 
   const blogHandlers = createBlogHandlers();
@@ -85,6 +92,7 @@ export function createBot(deps: BotDeps) {
   bot.command("food", foodHandlers.handleFoodCommand);
   bot.command("fav", foodHandlers.handleFavCommand);
   bot.command("yt", ytHandlers.handleYtCommand);
+  bot.command("pod", podHandlers.handlePodCommand);
   bot.command("report", reportHandlers.handleReportCommand);
   bot.command("cost", costHandlers.handleCostCommand);
   bot.command("blog", blogHandlers.handleBlogCommand);
@@ -100,6 +108,7 @@ export function createBot(deps: BotDeps) {
     { command: "fav", description: "Saved foods — list, log, or remove" },
     { command: "report", description: "Saturated fat report (today + weekly)" },
     { command: "yt", description: "YouTube — augmented notes from any video" },
+    { command: "pod", description: "Podcast — augmented notes from any episode" },
     { command: "cost", description: "AI spend report — today, week, month" },
     { command: "inspo", description: "Upload photo to Inspiration Board" },
     { command: "blog", description: "Blog — ideas, drafts, status" },
