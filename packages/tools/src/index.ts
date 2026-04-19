@@ -78,47 +78,6 @@ export {
   startSyncScheduler,
 } from "./tasks/index.js";
 
-// Voice Pipeline
-export type {
-  VoiceIntent,
-  VoiceSession,
-  PendingVoiceTask,
-  PendingState,
-  AgentRunResult,
-  ClaudeRunResult,
-  PrResult,
-  ProjectMapping,
-} from "./voice/index.js";
-export {
-  parseIntent,
-  getDefaultProjectMappings,
-  detectTaskType,
-  generateBranchName,
-  generatePrTitle,
-} from "./voice/index.js";
-export { runGeminiAgent } from "./voice/index.js";
-export type { AgentLLMProvider } from "./voice/index.js";
-export {
-  ensureCleanMain,
-  createBranchAndPush,
-  pushExistingBranch,
-  createDraftPr,
-  mergePr,
-  closePr,
-  remoteBranchExists,
-} from "./voice/index.js";
-export {
-  getActiveSession,
-  createSession,
-  updateSession,
-  deleteSession,
-  getAllSessions,
-  getPendingTask,
-  setPendingTask,
-  updatePendingTask,
-  deletePendingTask,
-} from "./voice/index.js";
-
 // Spoon
 export type { SpoonEntry } from "./spoon/spoon-tracker.js";
 export { logSpoon, getSpoonForDate, getSpoonForRange } from "./spoon/spoon-tracker.js";

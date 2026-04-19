@@ -6,8 +6,6 @@ import { createPodcastHandlers } from "./handlers/podcast.js";
 import { createReportHandlers } from "./handlers/report.js";
 import { createCostHandlers } from "./handlers/cost.js";
 import { createInspirationHandlers } from "./handlers/inspiration.js";
-import { createBlogHandlers } from "./handlers/blog.js";
-import { createVoiceHandlers } from "./handlers/voice.js";
 import { createSpoonHandlers } from "./handlers/spoon.js";
 import type { GeminiProvider } from "@cherryagent/core";
 import type { FitbitAuth } from "@cherryagent/tools";
@@ -58,15 +56,7 @@ export function createBot(deps: BotDeps) {
 
   const costHandlers = createCostHandlers(costConfig);
 
-  const blogHandlers = createBlogHandlers();
-
   const spoonHandlers = createSpoonHandlers();
-
-  const voiceHandlers = createVoiceHandlers({
-    gemini: deps.gemini,
-    botToken: deps.token,
-    costConfig,
-  });
 
   const surprideWebhookUrl = process.env.SURPRIDE_WEBHOOK_URL;
   const surprideToken = process.env.SURPRIDE_WEBHOOK_TOKEN;
@@ -95,9 +85,7 @@ export function createBot(deps: BotDeps) {
   bot.command("pod", podHandlers.handlePodCommand);
   bot.command("report", reportHandlers.handleReportCommand);
   bot.command("cost", costHandlers.handleCostCommand);
-  bot.command("blog", blogHandlers.handleBlogCommand);
   bot.command("spoon", spoonHandlers.handleSpoonCommand);
-  bot.command("voicereset", voiceHandlers.handleVoiceReset);
   if (inspoHandlers) {
     bot.command("inspo", inspoHandlers.handleInspoCommand);
   }
@@ -111,13 +99,8 @@ export function createBot(deps: BotDeps) {
     { command: "pod", description: "Podcast — augmented notes from any episode" },
     { command: "cost", description: "AI spend report — today, week, month" },
     { command: "inspo", description: "Upload photo to Inspiration Board" },
-    { command: "blog", description: "Blog — ideas, drafts, status" },
     { command: "spoon", description: "Spoon tracker — morning/evening check-in, report" },
-    { command: "voicereset", description: "Clear active voice coding session" },
   ]);
-
-  // Voice message handler
-  bot.on("message:voice", voiceHandlers.handleVoice);
 
   // Photo handler — route by caption
   bot.on("message:photo", (ctx) => {
@@ -128,10 +111,8 @@ export function createBot(deps: BotDeps) {
     return foodHandlers.handlePhoto(ctx);
   });
 
-  // Text handler — voice edit → spoon → food
+  // Text handler — spoon → food
   bot.on("message:text", async (ctx) => {
-    const voiceHandled = await voiceHandlers.handleVoiceText(ctx);
-    if (voiceHandled) return;
     const spoonHandled = await spoonHandlers.handleText(ctx);
     if (!spoonHandled) return foodHandlers.handleText(ctx);
   });
@@ -141,9 +122,6 @@ export function createBot(deps: BotDeps) {
     const data = ctx.callbackQuery?.data ?? "";
     if (data.startsWith("spoon_")) {
       return spoonHandlers.handleCallback(ctx);
-    }
-    if (data.startsWith("voice_")) {
-      return voiceHandlers.handleVoiceCallback(ctx);
     }
     return foodHandlers.handleCallback(ctx);
   });
