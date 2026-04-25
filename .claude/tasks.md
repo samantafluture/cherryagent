@@ -1,6 +1,6 @@
 # Project: CherryAgent
 
-> Last synced to repo: 2026-04-25T13:10:01+00:00
+> Last synced to repo: 2026-04-26T19:15:01+00:00
 > Last agent update: 2026-04-06
 
 ## Active Sprint
@@ -10,7 +10,7 @@
 
 ### P1 — Should do this week
 - [x] Add notes/body support to CherryTask sync so detailed context maps to GitHub Issue body instead of title (256 char limit) `[M]` #cherrytask ✅ 2026-04-25
-- [ ] Fix EACCES permission errors on .claude/tasks.md across all VPS projects caused by container user (node, UID 1000) vs host user (sam) mismatch `[S]` #devops
+- [x] Fix EACCES permission errors on .claude/tasks.md across all VPS projects caused by container user (node, UID 1000) vs host user (sam) mismatch `[S]` #devops ✅ 2026-04-25
 
 ### P2 — Nice to have
 
