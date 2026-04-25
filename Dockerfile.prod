@@ -40,6 +40,15 @@ RUN corepack enable && corepack prepare pnpm@10.27.0 --activate
 # Install git (for CherryTasks sync)
 RUN apk add --no-cache git
 
+# Remap node user from default UID 1000 → 1001 to match VPS host sam.
+# Without this, runtime user 1001 can't write to /home/node (owned by node:1000),
+# breaking git ops that touch ~/.gitconfig, ~/.cache, and mounted /home/sam/apps.
+RUN deluser node \
+  && addgroup -g 1001 node \
+  && adduser -D -u 1001 -G node -h /home/node node \
+  && mkdir -p /home/node/.cherryagent \
+  && chown -R 1001:1001 /home/node
+
 WORKDIR /app
 
 ENV NODE_ENV=production
@@ -57,11 +66,6 @@ RUN pnpm install --frozen-lockfile --prod
 COPY --from=build /app/packages/core/dist/ packages/core/dist/
 COPY --from=build /app/packages/tools/dist/ packages/tools/dist/
 COPY --from=build /app/packages/api/dist/ packages/api/dist/
-
-# Create data directory for token storage
-# VPS host sam is UID 1001:GID 1001 — container must match for volume mounts
-RUN mkdir -p /home/node/.cherryagent \
-  && chown -R 1001:1001 /home/node/.cherryagent
 
 # Git config for CherryTasks sync
 RUN git config --system safe.directory '*' \
