@@ -9,7 +9,7 @@ const TASK_COMMIT_MSG = "chore: update tasks";
 const GIT_TIMEOUT = 30_000; // 30 seconds
 
 export interface GitSyncResult {
-  action: "created" | "amended" | "pulled" | "conflict" | "no-change";
+  action: "created" | "amended" | "pulled" | "conflict" | "error" | "no-change";
   message: string;
 }
 
@@ -87,11 +87,10 @@ export async function pullChanges(repoPath: string): Promise<GitSyncResult> {
 
     return { action: "pulled", message: "Pulled latest changes" };
   } catch (err) {
-    const error = err as Error & { stderr?: string };
-    const errMsg = (error.stderr ?? "") + (error.message ?? "");
+    const errMsg = getGitErrorMessage(err);
 
     // Merge conflict — abort and keep VPS state
-    if (errMsg.includes("CONFLICT") || errMsg.includes("MERGE_HEAD exists")) {
+    if (isMergeConflictError(errMsg)) {
       await git(repoPath, ["merge", "--abort"]).catch(() => {});
       return {
         action: "conflict",
@@ -104,7 +103,10 @@ export async function pullChanges(repoPath: string): Promise<GitSyncResult> {
       return { action: "no-change", message: "Already up to date" };
     }
 
-    throw err;
+    return {
+      action: "error",
+      message: `Pull failed: ${errMsg || "Unknown git error"}`,
+    };
   }
 }
 
@@ -121,8 +123,8 @@ export async function pullAllProjects(
       const result = await pullChanges(repoPath);
       results.set(repoPath, result);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      results.set(repoPath, { action: "conflict", message: `Pull failed: ${message}` });
+      const message = getGitErrorMessage(err) || "Unknown git error";
+      results.set(repoPath, { action: "error", message: `Pull failed: ${message}` });
     }
   }
 
@@ -176,4 +178,22 @@ export async function commitAndPushFiles(
 
 async function git(cwd: string, args: string[]) {
   return execFileAsync("git", args, { cwd, timeout: GIT_TIMEOUT });
+}
+
+function isMergeConflictError(message: string): boolean {
+  return message.includes("CONFLICT") || message.includes("MERGE_HEAD exists");
+}
+
+function getGitErrorMessage(err: unknown): string {
+  if (typeof err === "string") return err.trim();
+  if (err && typeof err === "object") {
+    const error = err as Error & { stderr?: string; stdout?: string };
+    return [error.stderr, error.message, error.stdout]
+      .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+      .map((value) => value.trim())
+      .join(" ")
+      .trim();
+  }
+
+  return String(err).trim();
 }

@@ -33,6 +33,9 @@ export function startSyncScheduler(opts: SyncSchedulerOpts): ReturnType<typeof s
       if (result.action === "conflict" && opts.onConflict) {
         opts.onConflict(repoPath, result);
       }
+      if (result.action === "error" && opts.onError) {
+        opts.onError(repoPath, new Error(result.message));
+      }
     }
   };
 
