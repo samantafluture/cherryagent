@@ -116,6 +116,14 @@ export class FitbitAuth {
 
     if (!res.ok) {
       const error = await res.text();
+      // invalid_grant means the refresh token is revoked/rotated out. Clear tokens so
+      // subsequent calls don't retry with the same dead token and surface an actionable error.
+      if (res.status === 400 && error.includes("invalid_grant")) {
+        this.tokens = null;
+        throw new Error(
+          "Fitbit authorization expired. Send /fitbit_auth in Telegram to reconnect.",
+        );
+      }
       throw new Error(`Fitbit token refresh failed (${res.status}): ${error}`);
     }
 

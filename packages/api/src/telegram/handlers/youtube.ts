@@ -19,6 +19,7 @@ import {
   removeFavoriteByIndex,
   checkSpendWarning,
   fetchTranscript,
+  commitAndPushFiles,
 } from "@cherryagent/tools";
 import type { AugmentedProgressStep } from "@cherryagent/tools";
 
@@ -238,8 +239,15 @@ export function createYouTubeHandlers(deps: YouTubeDeps) {
           const date = new Date().toISOString().slice(0, 10);
           const slug = sanitizeFilename(result.metadata.title).replace(/\s+/g, "-").toLowerCase();
           const brainFilename = `yt-${slug}-${date}.md`;
-          await writeFile(join(rawDir, brainFilename), result.markdown, "utf-8");
-          await ctx.reply(`Saved to brain: library/raw/${brainFilename}`);
+          const brainFilePath = join(rawDir, brainFilename);
+          await writeFile(brainFilePath, result.markdown, "utf-8");
+          const gitResult = await commitAndPushFiles(
+            brainDir,
+            [brainFilePath],
+            `docs: add yt notes - ${result.metadata.title.slice(0, 60)}`,
+          );
+          const synced = gitResult.action === "created" ? " (synced to git)" : "";
+          await ctx.reply(`Saved to brain: library/raw/${brainFilename}${synced}`);
         } catch {
           // Non-critical — don't fail the pipeline
         }
