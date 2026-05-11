@@ -1,11 +1,13 @@
 import Fastify from "fastify";
 import { healthRoutes } from "./routes/health.js";
 import { fitbitCallbackRoute } from "./routes/fitbit-callback.js";
+import { fitbitHealthSummaryRoute } from "./routes/fitbit-health-summary.js";
 import { githubWebhookRoute } from "./routes/github-webhook.js";
 import type { FitbitAuth, GitSyncResult } from "@cherryagent/tools";
 
 interface ServerDeps {
   fitbitAuth?: FitbitAuth;
+  timezone?: string;
   githubWebhook?: {
     repoMap: Map<string, string>;
     webhookSecret: string;
@@ -24,6 +26,12 @@ export async function createServer(deps?: ServerDeps) {
 
   if (deps?.fitbitAuth) {
     await app.register(fitbitCallbackRoute(deps.fitbitAuth));
+    await app.register(
+      fitbitHealthSummaryRoute(
+        deps.fitbitAuth,
+        deps.timezone ?? "America/Toronto",
+      ),
+    );
   }
 
   if (deps?.githubWebhook) {
