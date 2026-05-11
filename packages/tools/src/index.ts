@@ -30,6 +30,8 @@ export { FitbitFoodLogReader } from "./fitbit/food-log-reader.js";
 export type { DailySummary, WeeklySummary } from "./fitbit/food-log-reader.js";
 export { formatOnDemandReport, formatWeeklyReport } from "./fitbit/sat-fat-report.js";
 export { startWeeklyReport } from "./fitbit/weekly-scheduler.js";
+export { getFitbitHealthSummary } from "./fitbit/health-summary.js";
+export type { FitbitHealthSummary } from "./fitbit/health-summary.js";
 
 // Cost
 export type { CostEntry } from "./cost/cost-tracker.js";
