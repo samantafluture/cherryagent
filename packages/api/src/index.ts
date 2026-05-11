@@ -6,6 +6,7 @@ import { execFileSync } from "node:child_process";
 
 const PORT = parseInt(process.env["PORT"] ?? "3000", 10);
 const HOST = process.env["HOST"] ?? "0.0.0.0";
+const TIMEZONE = process.env["USER_TIMEZONE"] ?? "America/Toronto";
 
 function requireEnv(key: string): string {
   const value = process.env[key];
@@ -77,9 +78,10 @@ async function main() {
     }
   }
 
-  // Start Fastify (health + Fitbit OAuth + GitHub webhook)
+  // Start Fastify (health + Fitbit OAuth + Fitbit health summary + GitHub webhook)
   const server = await createServer({
     fitbitAuth,
+    timezone: TIMEZONE,
     githubWebhook: webhookSecret
       ? {
           repoMap,
@@ -100,7 +102,7 @@ async function main() {
   const botToken = requireEnv("TELEGRAM_BOT_TOKEN");
   const weeklyReportTimer = startWeeklyReport({
     fitbitAuth,
-    timezone: process.env.USER_TIMEZONE,
+    timezone: TIMEZONE,
     sendMessage: async (html) => {
       await fetch(
         `https://api.telegram.org/bot${botToken}/sendMessage`,

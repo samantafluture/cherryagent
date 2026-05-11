@@ -37,7 +37,7 @@ export class FitbitAuth {
       response_type: "code",
       client_id: this.clientId,
       redirect_uri: this.redirectUri,
-      scope: "nutrition",
+      scope: "activity heartrate nutrition sleep weight",
       expires_in: "604800",
     });
     return `https://www.fitbit.com/oauth2/authorize?${params.toString()}`;
