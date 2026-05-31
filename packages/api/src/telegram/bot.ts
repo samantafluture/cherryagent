@@ -5,6 +5,7 @@ import { createYouTubeHandlers } from "./handlers/youtube.js";
 import { createPodcastHandlers } from "./handlers/podcast.js";
 import { createReportHandlers } from "./handlers/report.js";
 import { createCostHandlers } from "./handlers/cost.js";
+import { createBudgetHandlers } from "./handlers/budget.js";
 import { createInspirationHandlers } from "./handlers/inspiration.js";
 import { createSpoonHandlers } from "./handlers/spoon.js";
 import type { GeminiProvider } from "@cherryagent/core";
@@ -56,6 +57,8 @@ export function createBot(deps: BotDeps) {
 
   const costHandlers = createCostHandlers(costConfig);
 
+  const budgetHandlers = createBudgetHandlers();
+
   const spoonHandlers = createSpoonHandlers();
 
   const surprideWebhookUrl = process.env.SURPRIDE_WEBHOOK_URL;
@@ -85,6 +88,7 @@ export function createBot(deps: BotDeps) {
   bot.command("pod", podHandlers.handlePodCommand);
   bot.command("report", reportHandlers.handleReportCommand);
   bot.command("cost", costHandlers.handleCostCommand);
+  bot.command("budget", budgetHandlers.handleBudgetCommand);
   bot.command("spoon", spoonHandlers.handleSpoonCommand);
   if (inspoHandlers) {
     bot.command("inspo", inspoHandlers.handleInspoCommand);
@@ -98,6 +102,7 @@ export function createBot(deps: BotDeps) {
     { command: "yt", description: "YouTube — augmented notes from any video" },
     { command: "pod", description: "Podcast — augmented notes from any episode" },
     { command: "cost", description: "AI spend report — today, week, month" },
+    { command: "budget", description: "Variable expense budget — week, log, check, month" },
     { command: "inspo", description: "Upload photo to Inspiration Board" },
     { command: "spoon", description: "Spoon tracker — morning/evening check-in, report" },
   ]);
@@ -122,6 +127,9 @@ export function createBot(deps: BotDeps) {
     const data = ctx.callbackQuery?.data ?? "";
     if (data.startsWith("spoon_")) {
       return spoonHandlers.handleCallback(ctx);
+    }
+    if (data.startsWith("budget_")) {
+      return budgetHandlers.handleCallback(ctx);
     }
     return foodHandlers.handleCallback(ctx);
   });

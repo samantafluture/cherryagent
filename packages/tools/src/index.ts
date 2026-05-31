@@ -38,6 +38,31 @@ export type { CostEntry } from "./cost/cost-tracker.js";
 export { logCost, getCostsForDate, getCostsForRange, getDailyCost, getMonthlyCost } from "./cost/cost-tracker.js";
 export { formatCostReport, checkSpendWarning } from "./cost/cost-report.js";
 
+// Budget
+export type { BudgetCategory, BudgetCategoryId } from "./budget/categories.js";
+export {
+  BUDGET_CATEGORIES,
+  formatCad,
+  getBudgetCategory,
+  isBudgetCategoryId,
+} from "./budget/categories.js";
+export type { BudgetEntry } from "./budget/budget-tracker.js";
+export {
+  logBudgetEntry,
+  getBudgetEntriesForWeek,
+  getCurrentWeekBudgetEntries,
+  getCurrentMonthBudgetEntries,
+  undoLastBudgetEntry,
+} from "./budget/budget-tracker.js";
+export { inferBudgetCategories } from "./budget/categorizer.js";
+export {
+  formatWeeklyBudgetReport,
+  formatMonthlyBudgetReport,
+  formatBudgetEntryReceipt,
+  formatBudgetUndoReceipt,
+  formatBudgetCheckReport,
+} from "./budget/budget-report.js";
+
 // Inspiration
 export { uploadToInspirationBoard } from "./inspiration/upload.js";
 export type { InspirationUploadResult } from "./inspiration/upload.js";

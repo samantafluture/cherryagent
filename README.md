@@ -96,6 +96,16 @@ Log food intake through Telegram and sync to Fitbit's Food Log API. Four input m
 
 The bot parses the input, shows a confirmation with calories and macros, and lets you pick a meal type before logging to Fitbit.
 
+### Budget Tracker (Telegram)
+
+Track variable expenses against the weekly envelope targets from the monthly tracker workbook.
+
+- `/budget` — current week dashboard
+- `/budget log 18.42 Starbucks` — log an expense
+- `/budget check 45 Amazon storage bins` — preview a purchase before spending
+- `/budget month` — current month variable totals
+- `/budget undo` — remove the most recent logged expense
+
 ## Design Docs
 
 Detailed specs live in `.claude/docs/`:
